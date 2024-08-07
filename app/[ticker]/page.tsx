@@ -1,8 +1,8 @@
 import { Grid, Typography, Box } from '@mui/material';
-import yahooFinance from 'yahoo-finance2';
 import { getTickers } from '../lib/tickers';
 import { Filing, CategorizedFilings } from '../lib/definitions';
 import FilingCard from '../ui/filing-card';
+import yahooFinance from 'yahoo-finance2';
 
 export default async function Page({ params }: { params: { ticker: string } }) {
     function categorizeFilings(forms: Filing[]): CategorizedFilings {
@@ -90,20 +90,20 @@ export default async function Page({ params }: { params: { ticker: string } }) {
 
         return categories;
     }
-    
-    async function getYahooQuote(ticker: string, retries = 1): Promise<yahooFinance.Quote | null> {
-      try {
-        return await yahooFinance.quote(ticker);
-      } catch (error) {
-        if (retries > 0) {
-          console.log(`Retrying Yahoo Finance API call for ${ticker}...`);
-          return getYahooQuote(ticker, retries - 1);
+
+    async function getYahooQuote(ticker: string, retries = 1) {
+        try {
+            return await yahooFinance.quote(ticker);
+        } catch (error) {
+            if (retries > 0) {
+                console.log(`Retrying Yahoo Finance API call for ${ticker}...`);
+                return getYahooQuote(ticker, retries - 1);
+            }
+            console.error('Yahoo Finance API error:', error);
+            return null;
         }
-        console.error('Yahoo Finance API error:', error);
-        return null;
-      }
     }
-    
+
     const ticker = params.ticker;
     const quote = await getYahooQuote(ticker, 1);
     const tickers = await getTickers();
