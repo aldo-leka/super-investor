@@ -1,6 +1,5 @@
 import { getTickers } from "@/app/lib/tickers";
 import HTMLViewer from "@/app/ui/html-viewer";
-import dynamic from 'next/dynamic';
 import PDFViewer from "@/app/ui/pdf-viewer";
 import PlainTextViewer from "@/app/ui/plain-text-viewer";
 import XMLViewer from "@/app/ui/xml-viewer";
@@ -11,13 +10,13 @@ export default async function Page({ params }: { params: { ticker: string, 'acce
     const padded_cik = cik ? cik.toString().padStart(10, '0') : null;
     const res = await fetch(`https://data.sec.gov/submissions/CIK${padded_cik}.json`);
     const json = await res.json();
-    
+
     const accessionIndex = json.filings.recent.accessionNumber.findIndex(
         (accession: string) => accession === params['accession-number']
     );
-    
-    const document = accessionIndex !== -1 
-        ? json.filings.recent.primaryDocument[accessionIndex] 
+
+    const document = accessionIndex !== -1
+        ? json.filings.recent.primaryDocument[accessionIndex]
         : null;
 
     const filing_res = await fetch(`https://www.sec.gov/Archives/edgar/data/${padded_cik}/${params['accession-number'].replace(/-/g, '')}/${document}`);

@@ -1,8 +1,10 @@
+import { Ticker } from "@/app/lib/definitions";
+
 let cachedData: any = null;
 let lastFetchTime: number = 0;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
-export async function getTickers() {
+export async function getTickers(): Promise<Ticker[]> {
     if (cachedData && Date.now() - lastFetchTime < CACHE_DURATION) {
         return cachedData;
     }

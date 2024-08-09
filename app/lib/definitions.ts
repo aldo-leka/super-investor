@@ -1,3 +1,13 @@
+export type User = {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    email_verified: boolean;
+    password: string;
+    verification_token: string | null;
+};
+
 export type Filing = {
     ticker: string;
     accessionNumber: string;
@@ -14,4 +24,10 @@ export type CategorizedFilings = {
     news: Filing[];
     proxies: Filing[];
     other: Filing[];
+}
+
+export type Ticker = {
+    label: string;
+    value: string;
+    cik: string;
 }

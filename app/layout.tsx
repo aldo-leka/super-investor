@@ -1,21 +1,33 @@
-import { AppRouterCacheProvider } from '@mui/material-nextjs/v13-appRouter';
-import { ThemeProvider } from '@mui/material/styles';
-import theme from './theme';
-import TopBar from './ui/top-bar';
+import '@/app/ui/globals.css';
+import { Metadata } from 'next';
+import { inter } from '@/app/ui/fonts';
+import AppBar from '@/app/ui/app-bar';
+import { auth } from '@/auth';
+import { SessionProvider } from 'next-auth/react';
+import Footer from '@/app/ui/footer';
 import { getTickers } from './lib/tickers';
 
+export const metadata: Metadata = {
+  title: {
+    template: '%s | Super Investor',
+    default: 'Super Investor',
+  },
+  description: 'Enhance your SEC filings workflow with Super Investor.',
+  metadataBase: new URL('https://getsuperinvestor.com'),
+};
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const options = await getTickers();
+  const session = await auth();
+  const tickers = await getTickers();
 
   return (
     <html lang="en">
-      <body>
-        <AppRouterCacheProvider>
-          <ThemeProvider theme={theme}>
-            <TopBar options={options} />
-            {children}
-          </ThemeProvider>
-        </AppRouterCacheProvider>
+      <body className={`${inter.className} antialiased`}>
+        <SessionProvider session={session}>
+          <AppBar tickers={tickers} />
+          {children}
+          <Footer />
+        </SessionProvider>
       </body>
     </html>
   );

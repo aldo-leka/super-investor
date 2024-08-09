@@ -1,7 +1,6 @@
-import { Grid, Typography, Box } from '@mui/material';
-import { getTickers } from '../lib/tickers';
-import { Filing, CategorizedFilings } from '../lib/definitions';
-import FilingCard from '../ui/filing-card';
+import { getTickers } from '@/app/lib/tickers';
+import { Filing, CategorizedFilings } from '@/app/lib/definitions';
+import FilingCard from '@/app/ui/filing-card';
 import yahooFinance from 'yahoo-finance2';
 
 export default async function Page({ params }: { params: { ticker: string } }) {
@@ -126,11 +125,11 @@ export default async function Page({ params }: { params: { ticker: string } }) {
     const name = json.name;
 
     return (
-        <div>
-            <Typography variant="h5" gutterBottom sx={{ mt: 2 }}>
+        <div className="p-4">
+            <h1 className="text-2xl font-bold mt-4 mb-2">
                 {name}
-            </Typography>
-            <Typography variant='body2' sx={{ mb: 2 }}>
+            </h1>
+            <p className="text-sm mb-4">
                 {exchange}: {ticker}&nbsp;&nbsp;&nbsp;&nbsp;
                 {quote && quote.regularMarketPrice && (
                     <>
@@ -142,14 +141,14 @@ export default async function Page({ params }: { params: { ticker: string } }) {
                         Market cap: <strong>${(quote.marketCap / 1e9).toFixed(1)} billion</strong>
                     </>
                 )}
-            </Typography>
-            <Grid container spacing={2}>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 {Object.entries(categorizedFilings).map(([category, filings]) => (
-                    <Grid item xs={12} sm={6} md={4} key={category}>
+                    <div key={category}>
                         <FilingCard category={category} filings={filings} />
-                    </Grid>
+                    </div>
                 ))}
-            </Grid>
+            </div>
         </div>
     );
 }

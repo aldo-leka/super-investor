@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { Filing } from "../lib/definitions";
-import { Button, Card, CardContent, Paper, Table, TableBody, TableCell, TableContainer, TableRow, Typography } from "@mui/material";
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useRouter } from 'next/navigation';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
 export default function FilingCard({ category, filings }: { category: string, filings: Filing[] }) {
     const [showMore, setShowMore] = useState(false);
@@ -12,48 +11,38 @@ export default function FilingCard({ category, filings }: { category: string, fi
     const router = useRouter();
 
     const handleRowClick = (ticker: string, accessionNumber: string) => {
-        router.push(`/${ticker}/${accessionNumber}`);
+        router.push(`${ticker}/${accessionNumber}`);
     };
 
     return (
-        <Card>
-            <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ textTransform: 'capitalize' }}>
-                    {category}
-                </Typography>
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableBody>
+        <div className="bg-white rounded-lg shadow-md">
+            <div className="p-4">
+                <h2 className="text-xl font-semibold mb-4 capitalize">{category}</h2>
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <tbody>
                             {displayFilings.map((filing, index) => (
-                                <TableRow
+                                <tr
                                     key={index}
-                                    hover
+                                    className="hover:bg-gray-100 cursor-pointer"
                                     onClick={() => handleRowClick(filing.ticker, filing.accessionNumber)}
-                                    sx={{ cursor: 'pointer' }}
                                 >
-                                    <TableCell>
-                                        {filing.form}
-                                    </TableCell>
-                                    <TableCell>
-                                        {filing.filingDate}
-                                    </TableCell>
-                                    <TableCell>
-                                        {filing.primaryDocument}
-                                    </TableCell>
-                                </TableRow>
+                                    <td className="py-2 px-4 border-b">{filing.form}</td>
+                                    <td className="py-2 px-4 border-b">{filing.filingDate}</td>
+                                </tr>
                             ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                        </tbody>
+                    </table>
+                </div>
                 {filings.length > 5 && (
-                    <Button
+                    <button
                         onClick={() => setShowMore(!showMore)}
-                        startIcon={<ExpandMoreIcon />}
-                        fullWidth
+                        className="w-full mt-4 py-2 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded"
                     >
-                    </Button>
+                        <ChevronDownIcon className="h-5 w-5 mr-1" />
+                    </button>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 }
