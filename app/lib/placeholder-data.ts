@@ -7,6 +7,7 @@ const users: User[] = [
         last_name: 'Leka',
         email: 'aldo.leka@live.com',
         password: 'Hercules123!',
+        verification_token: null,
         email_verified: true,
     },
 ];
