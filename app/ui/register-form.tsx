@@ -30,12 +30,12 @@ export default function RegisterForm() {
                             <input id="email" name="email" type="email" autoComplete="email" required className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Email address" />
                         </div>
                         <div>
-                            <label htmlFor="first_name" className="sr-only">First name</label>
-                            <input id="first_name" name="first_name" type="text" autoComplete="given-name" className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="First name (optional)" />
+                            <label htmlFor="firstName" className="sr-only">First name</label>
+                            <input id="firstName" name="firstName" type="text" autoComplete="given-name" className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="First name (optional)" />
                         </div>
                         <div>
-                            <label htmlFor="last_name" className="sr-only">Last name</label>
-                            <input id="last_name" name="last_name" type="text" autoComplete="family-name" className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Last name (optional)" />
+                            <label htmlFor="lastName" className="sr-only">Last name</label>
+                            <input id="lastName" name="lastName" type="text" autoComplete="family-name" className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm" placeholder="Last name (optional)" />
                         </div>
                         <div>
                             <label htmlFor="password" className="sr-only">Password</label>

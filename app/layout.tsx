@@ -1,32 +1,46 @@
-import '@/app/ui/globals.css';
-import { Metadata } from 'next';
-import { inter } from '@/app/ui/fonts';
-import AppBar from '@/app/ui/app-bar';
-import { auth } from '@/auth';
-import { SessionProvider } from 'next-auth/react';
-import Footer from '@/app/ui/footer';
-import { getTickers } from './lib/tickers';
+import "@/styles/globals.css";
 
-export const metadata: Metadata = {
-  title: {
-    template: '%s | Super Investor',
-    default: 'Super Investor',
-  },
-  description: 'Enhance your SEC filings workflow with Super Investor.',
-  metadataBase: new URL('https://getsuperinvestor.com'),
-};
+import { fontGeist, fontHeading, fontSans, fontUrban } from "@/assets/fonts";
+import { SessionProvider } from "next-auth/react";
+import { ThemeProvider } from "next-themes";
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth();
-  const tickers = await getTickers();
+import { cn, constructMetadata } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@/components/analytics";
+import ModalProvider from "@/components/modals/providers";
+import { TailwindIndicator } from "@/components/tailwind-indicator";
 
+interface RootLayoutProps {
+  children: React.ReactNode;
+}
+
+export const metadata = constructMetadata();
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} antialiased`}>
-        <SessionProvider session={session}>
-          <AppBar tickers={tickers} />
-          {children}
-          <Footer />
+    <html lang="en" suppressHydrationWarning>
+      <head />
+      <body
+        className={cn(
+          "min-h-screen bg-background font-sans antialiased",
+          fontSans.variable,
+          fontUrban.variable,
+          fontHeading.variable,
+          fontGeist.variable,
+        )}
+      >
+        <SessionProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ModalProvider>{children}</ModalProvider>
+            <Analytics />
+            <Toaster richColors closeButton />
+            <TailwindIndicator />
+          </ThemeProvider>
         </SessionProvider>
       </body>
     </html>

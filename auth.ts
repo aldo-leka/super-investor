@@ -1,72 +1,67 @@
-import NextAuth from 'next-auth';
-import Credentials from 'next-auth/providers/credentials';
-import { authConfig } from './auth.config';
-import { z } from 'zod';
-import { sql } from '@vercel/postgres';
-import type { User } from '@/app/lib/definitions';
-import bcrypt from 'bcrypt';
+import authConfig from "@/auth.config";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { UserRole } from "@prisma/client";
+import NextAuth, { type DefaultSession } from "next-auth";
 
-async function getUser(email: string): Promise<User | undefined> {
-    try {
-        const user = await sql<User>`SELECT * FROM users WHERE email=${email}`;
-        return user.rows[0];
-    } catch (error) {
-        console.error('Failed to fetch user:', error);
-        throw new Error('Failed to fetch user.');
-    }
+import { prisma } from "@/lib/db";
+import { getUserById } from "@/lib/user";
+
+// More info: https://authjs.dev/getting-started/typescript#module-augmentation
+declare module "next-auth" {
+  interface Session {
+    user: {
+      role: UserRole;
+    } & DefaultSession["user"];
+  }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-    ...authConfig,
-    providers: [
-        Credentials({
-            async authorize(credentials) {
-                const parsedCredentials = z
-                    .object({ email: z.string().email(), password: z.string().min(6) })
-                    .safeParse(credentials);
+export const {
+  handlers: { GET, POST },
+  auth,
+} = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  session: { strategy: "jwt" },
+  pages: {
+    signIn: "/login",
+    // error: "/auth/error",
+  },
+  callbacks: {
+    async session({ token, session }) {
+      if (session.user) {
+        if (token.sub) {
+          session.user.id = token.sub;
+        }
 
-                if (parsedCredentials.success) {
-                    const { email, password } = parsedCredentials.data;
-                    const user = await getUser(email);
-                    if (!user) return null;
-                    if (!user.email_verified) {
-                        throw new Error('Please verify your email before logging in.');
-                    }
-                    const passwordsMatch = await bcrypt.compare(password, user.password);
-                    if (passwordsMatch) {
-                        return {
-                            id: user.id,
-                            email: user.email,
-                            first_name: user.first_name,
-                            last_name: user.last_name,
-                        };
-                    }
-                }
-                
-                console.log('Invalid credentials');
-                return null;
-            },
-        }),
-    ],
-    callbacks: {
-        async jwt({ token, user }) {
-            //console.log('auth.ts user, token', user, token);
-            if (user) {
-                token.first_name = user.first_name;
-                token.last_name = user.last_name;
-            }
+        if (token.email) {
+          session.user.email = token.email;
+        }
 
-            //console.log('auth.ts changed token', token);
-            return token;
-        },
-        async session({ session, token }) {
-            //console.log('auth.ts session, token', session, token);
-            if (session.user) {
-                session.user.first_name = token.first_name as string;
-                session.user.last_name = token.last_name as string;
-            }
-            //console.log('auth.ts changed session', session);
-            return session;
-        },
-    }
+        if (token.role) {
+          session.user.role = token.role;
+        }
+
+        session.user.name = token.name;
+        session.user.image = token.picture;
+      }
+
+      return session;
+    },
+
+    async jwt({ token }) {
+      if (!token.sub) return token;
+
+      const dbUser = await getUserById(token.sub);
+
+      if (!dbUser) return token;
+
+      token.name = dbUser.name;
+      token.email = dbUser.email;
+      token.picture = dbUser.image;
+      token.role = dbUser.role;
+
+      return token;
+    },
+  },
+  ...authConfig,
+  // debug: process.env.NODE_ENV !== "production"
 });

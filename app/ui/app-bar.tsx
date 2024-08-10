@@ -77,7 +77,7 @@ export default function AppBar({ tickers }: { tickers: Ticker[] }) {
         return (first + last).toUpperCase();
     };
 
-    const userInitials = user ? getInitials(user.first_name, user.last_name) : 'G'; // G for Guest User
+    const userInitials = user ? getInitials(user.firstName, user.lastName) : 'G'; // G for Guest User
 
     return (
         <nav className="bg-blue-600 p-4">
@@ -130,7 +130,7 @@ export default function AppBar({ tickers }: { tickers: Ticker[] }) {
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabIndex={-1}>
                                     <div className="px-4 py-2 text-sm text-gray-500 border-b border-gray-200">
-                                        {user?.first_name} {user?.last_name}
+                                        {user?.firstName} {user?.lastName}
                                     </div>
                                     <Link href="/settings/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" role="menuitem" tabIndex={-1}>
                                         Account
