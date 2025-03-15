@@ -160,7 +160,7 @@ export function TickerSearch() {
                                     <Check
                                         className={cn(
                                             "mr-2 h-4 w-4",
-                                            selectedTicker === ticker.ticker ? "opacity-100" : "opacity-0"
+                                            selectedTicker.ticker === ticker.ticker ? "opacity-100" : "opacity-0"
                                         )}
                                     />
                                     {`${ticker.ticker} (${ticker.title})`}
