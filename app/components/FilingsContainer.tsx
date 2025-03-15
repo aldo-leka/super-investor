@@ -15,8 +15,8 @@ export default function FilingsContainer() {
     useEffect(() => {
         const fetchFilings = async () => {
             try {
-                const cik = selectedTicker ? selectedTicker.cik_str : "";
-                const res = await fetch(`/api/filings?cik=${cik}`);
+                const cik = selectedTicker ? selectedTicker.cik : "";
+                const res = await fetch(`/api/submissions?cik=${cik}`);
                 const data: SubmissionApi = await res.json();
 
                 let filings: Filing[] = [];

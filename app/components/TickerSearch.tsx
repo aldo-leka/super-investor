@@ -21,6 +21,12 @@ import {
 import {useEffect, useState} from "react";
 import {useStonks} from "@/store/StonksContext";
 import {TickerApi} from "@/lib/types";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 const toTitleCase = (str: string) => {
     return str
@@ -38,7 +44,7 @@ export function TickerSearch() {
     const [isLoading, setIsLoading] = useState(true);
     const placeholder = isLoading
         ? "Loading tickers..."
-        : "Search";
+        : "Select ticker...";
 
     useEffect(() => {
         const fetchTickers = async () => {
@@ -47,7 +53,7 @@ export function TickerSearch() {
                 const data = await res.json();
 
                 const tickers = Object.values(data).map(item => ({
-                    cik_str: item.cik_str,
+                    cik: item.cik_str,
                     ticker: item.ticker,
                     title: toTitleCase(item.title)
                 }));
