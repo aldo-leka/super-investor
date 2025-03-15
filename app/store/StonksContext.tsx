@@ -1,7 +1,7 @@
 "use client";
 
 import {createContext, ReactNode, useContext, useState} from "react";
-import {Filing, TickerApi} from "@/lib/types";
+import {Filing, Ticker} from "@/lib/types";
 
 interface StonksContextType {
     selectedTicker: Ticker;
