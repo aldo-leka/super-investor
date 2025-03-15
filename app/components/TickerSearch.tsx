@@ -38,7 +38,7 @@ export function TickerSearch() {
     const [isLoading, setIsLoading] = useState(true);
     const placeholder = isLoading
         ? "Loading tickers..."
-        : "Search for a stock (e.g., AAPL, Tesla)";
+        : "Search";
 
     useEffect(() => {
         const fetchTickers = async () => {
@@ -63,6 +63,67 @@ export function TickerSearch() {
         fetchTickers();
     }, []);
 
+    const filterTickers = (e: string) => {
+        const value = e.trim().toLowerCase();
+        if (value) {
+            setTickers(
+                allTickers.filter(
+                    (ticker) =>
+                        ticker.ticker.toLowerCase().includes(value) ||
+                        ticker.title.toLowerCase().includes(value)
+                ).sort((a, b) => {
+                    const input = value.toUpperCase(); // Ensure case-insensitivity
+
+                    const aTicker = a.ticker.toUpperCase();
+                    const bTicker = b.ticker.toUpperCase();
+                    const aTitle = a.title.toUpperCase();
+                    const bTitle = b.title.toUpperCase();
+
+                    // Exact match on ticker
+                    if (aTicker === input) return -1;
+                    if (bTicker === input) return 1;
+
+                    // Ticker starts with input
+                    const aTickerStarts = aTicker.startsWith(input);
+                    const bTickerStarts = bTicker.startsWith(input);
+
+                    if (aTickerStarts && !bTickerStarts) return -1;
+                    if (!aTickerStarts && bTickerStarts) return 1;
+
+                    // Title starts with input
+                    const aTitleStarts = aTitle.startsWith(input);
+                    const bTitleStarts = bTitle.startsWith(input);
+
+                    if (aTitleStarts && !bTitleStarts) return -1;
+                    if (!aTitleStarts && bTitleStarts) return 1;
+
+                    // Ticker contains input anywhere
+                    const aTickerContains = aTicker.includes(input);
+                    const bTickerContains = bTicker.includes(input);
+
+                    if (aTickerContains && !bTickerContains) return -1;
+                    if (!aTickerContains && bTickerContains) return 1;
+
+                    // Title contains input anywhere
+                    const aTitleContains = aTitle.includes(input);
+                    const bTitleContains = bTitle.includes(input);
+
+                    if (aTitleContains && !bTitleContains) return -1;
+                    if (!aTitleContains && bTitleContains) return 1;
+
+                    // Final fallback: Sort alphabetically by ticker
+                    if (aTicker < bTicker) return -1;
+                    if (aTicker > bTicker) return 1;
+
+                    // If tickers are the same, sort by company title alphabetically
+                    return aTitle.localeCompare(bTitle);
+                }).slice(0, 5)
+            )
+        } else {
+            setTickers([]);
+        }
+    };
+
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild disabled={isLoading}>
@@ -80,66 +141,7 @@ export function TickerSearch() {
                 <Command>
                     <CommandInput
                         placeholder={placeholder}
-                        onValueChange={(e: string) => {
-                            const value = e.trim().toLowerCase();
-                            if (value) {
-                                setTickers(
-                                    allTickers.filter(
-                                        (ticker) =>
-                                            ticker.ticker.toLowerCase().includes(value) ||
-                                            ticker.title.toLowerCase().includes(value)
-                                    ).sort((a, b) => {
-                                        const input = value.toUpperCase(); // Ensure case-insensitivity
-
-                                        const aTicker = a.ticker.toUpperCase();
-                                        const bTicker = b.ticker.toUpperCase();
-                                        const aTitle = a.title.toUpperCase();
-                                        const bTitle = b.title.toUpperCase();
-
-                                        // ✅ 1️⃣ Exact match on ticker → First priority
-                                        if (aTicker === input) return -1;
-                                        if (bTicker === input) return 1;
-
-                                        // ✅ 2️⃣ Ticker starts with input → Second priority
-                                        const aTickerStarts = aTicker.startsWith(input);
-                                        const bTickerStarts = bTicker.startsWith(input);
-
-                                        if (aTickerStarts && !bTickerStarts) return -1;
-                                        if (!aTickerStarts && bTickerStarts) return 1;
-
-                                        // ✅ 3️⃣ Title starts with input → Third priority
-                                        const aTitleStarts = aTitle.startsWith(input);
-                                        const bTitleStarts = bTitle.startsWith(input);
-
-                                        if (aTitleStarts && !bTitleStarts) return -1;
-                                        if (!aTitleStarts && bTitleStarts) return 1;
-
-                                        // ✅ 4️⃣ Ticker contains input anywhere → Fourth priority
-                                        const aTickerContains = aTicker.includes(input);
-                                        const bTickerContains = bTicker.includes(input);
-
-                                        if (aTickerContains && !bTickerContains) return -1;
-                                        if (!aTickerContains && bTickerContains) return 1;
-
-                                        // ✅ 5️⃣ Title contains input anywhere → Fifth priority
-                                        const aTitleContains = aTitle.includes(input);
-                                        const bTitleContains = bTitle.includes(input);
-
-                                        if (aTitleContains && !bTitleContains) return -1;
-                                        if (!aTitleContains && bTitleContains) return 1;
-
-                                        // ✅ 6️⃣ Final fallback: Sort alphabetically by ticker
-                                        if (aTicker < bTicker) return -1;
-                                        if (aTicker > bTicker) return 1;
-
-                                        // ✅ 7️⃣ If tickers are the same, sort by company title alphabetically
-                                        return aTitle.localeCompare(bTitle);
-                                    }).slice(0, 5)
-                                )
-                            } else {
-                                setTickers([]);
-                            }
-                        }}/>
+                        onValueChange={filterTickers}/>
                     <CommandList>
                         <CommandEmpty>No stocks found.</CommandEmpty>
                         <CommandGroup>

@@ -1,9 +1,7 @@
-import FilingsContainer from "@/components/FilingsContainer";
+import {FilingViewer} from "@/components/FilingViewer";
 
 export default function Home() {
     return (
-        <div className="flex flex-col gap-6">
-            <FilingsContainer />
-        </div>
+        <FilingViewer/>
     );
 }

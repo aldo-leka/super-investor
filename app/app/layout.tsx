@@ -25,14 +25,10 @@ export default function RootLayout(
         <body
             className={`${merriweather.className} antialiased`}
         >
-        <div className="min-h-screen bg-[#3b2b1b]">
-            <StonksContextProvider>
-                <Navbar/>
-                <main className="container mx-auto p-6">
-                    {children}
-                </main>
-            </StonksContextProvider>
-        </div>
+        <StonksContextProvider>
+            <Navbar/>
+            {children}
+        </StonksContextProvider>
         </body>
         </html>
     );

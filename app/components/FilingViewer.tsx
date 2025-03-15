@@ -24,7 +24,7 @@ export function FilingViewer({filing}: FilingViewerProps) {
     }, []);
 
     return (
-        <div className="h-[500px] overflow-y-auto border p-4 bg-[#3b2b1b] text-[#f1c27d]">
+        <div className="p-4">
             {content ? (
                 <div dangerouslySetInnerHTML={{__html: content}}/>
             ) : (
