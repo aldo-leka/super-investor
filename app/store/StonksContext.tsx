@@ -4,8 +4,8 @@ import {createContext, ReactNode, useContext, useState} from "react";
 import {Filing, TickerApi} from "@/lib/types";
 
 interface StonksContextType {
-    selectedTicker: TickerApi;
-    setSelectedTicker: (ticker: TickerApi | null) => void;
+    selectedTicker: Ticker;
+    setSelectedTicker: (ticker: Ticker | null) => void;
     selectedFiling: Filing;
     setSelectedFiling: (filing: Filing | null) => void;
 }
@@ -21,7 +21,7 @@ export const useStonks = () => {
 };
 
 export function StonksContextProvider({children}: { children: ReactNode }) {
-    const [selectedTicker, setSelectedTicker] = useState<TickerApi | null>();
+    const [selectedTicker, setSelectedTicker] = useState<Ticker | null>();
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>();
 
     return (

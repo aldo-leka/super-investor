@@ -1,5 +1,5 @@
 export interface TickerApi {
-    cik: string;
+    cik_str: number;
     ticker: string;
     title: string;
 }
@@ -21,6 +21,12 @@ export interface FilingApi {
     filingDate: string[];
     form: string[];
     primaryDocument: string[];
+}
+
+export interface Ticker {
+    cik: string;
+    ticker: string;
+    title: string;
 }
 
 export interface Filing {

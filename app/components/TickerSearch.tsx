@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/popover";
 import {useEffect, useState} from "react";
 import {useStonks} from "@/store/StonksContext";
-import {TickerApi} from "@/lib/types";
+import {Ticker, TickerApi} from "@/lib/types";
 
 const toTitleCase = (str: string) => {
     return str
@@ -31,8 +31,8 @@ const toTitleCase = (str: string) => {
 };
 
 export function TickerSearch() {
-    const [tickers, setTickers] = useState<TickerApi[]>([]);
-    const [allTickers, setAllTickers] = useState<TickerApi[]>([]);
+    const [tickers, setTickers] = useState<Ticker[]>([]);
+    const [allTickers, setAllTickers] = useState<Ticker[]>([]);
     const [open, setOpen] = useState(false);
     const {selectedTicker, setSelectedTicker} = useStonks();
     const [isLoading, setIsLoading] = useState(true);
@@ -46,8 +46,8 @@ export function TickerSearch() {
                 const res = await fetch("/api/tickers");
                 const data = await res.json();
 
-                const tickers = Object.values(data).map(item => ({
-                    cik: item.cik_str,
+                const tickers = Object.values(data as Record<string, TickerApi>).map(item => ({
+                    cik: String(item.cik_str),
                     ticker: item.ticker,
                     title: toTitleCase(item.title)
                 }));
