@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
 
         const data = await response.text();
         return new Response(data, {
-            headers: { "Content-Type": "text/html" }
+            headers: {"Content-Type": "text/html"}
         });
     } catch (error) {
-        return Response.json({error: error.message}, {status: 500});
+        return Response.json({error: error}, {status: 500});
     }
 }
