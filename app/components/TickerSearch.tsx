@@ -21,12 +21,6 @@ import {
 import {useEffect, useState} from "react";
 import {useStonks} from "@/store/StonksContext";
 import {TickerApi} from "@/lib/types";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip"
 
 const toTitleCase = (str: string) => {
     return str
