@@ -4,10 +4,10 @@ import {createContext, ReactNode, useContext, useState} from "react";
 import {Filing, Ticker} from "@/lib/types";
 
 interface StonksContextType {
-    selectedTicker: Ticker;
-    setSelectedTicker: (ticker: Ticker | null) => void;
-    selectedFiling: Filing;
-    setSelectedFiling: (filing: Filing | null) => void;
+    selectedTicker: Ticker | null | undefined;
+    setSelectedTicker: (ticker: Ticker | null | undefined) => void;
+    selectedFiling: Filing | null | undefined;
+    setSelectedFiling: (filing: Filing | null | undefined) => void;
 }
 
 export const StonksContext = createContext<StonksContextType | undefined>(undefined);
