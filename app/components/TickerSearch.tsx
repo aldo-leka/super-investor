@@ -43,7 +43,7 @@ export function TickerSearch() {
     useEffect(() => {
         const fetchTickers = async () => {
             try {
-                const res = await fetch("/api/tickers");
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers`);
                 const data = await res.json();
 
                 const tickers = Object.values(data as Record<string, TickerApi>).map(item => ({

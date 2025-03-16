@@ -2,12 +2,7 @@
 *A modern platform for reading SEC filings with style & convenience.*
 
 ## 🚀 About This Project
-**Super-Investor** is an **open-source investment research tool** that makes **reading company reports (SEC filings)** enjoyable, fast, and intuitive.
-
-🔹 **Fast & Responsive** → No more clunky PDFs.  
-🔹 **Clean Design** → Read filings in a **beautiful format**.  
-🔹 **Smart Search** → Find reports **by ticker or company name**.  
-🔹 **Future Plans** → AI-powered insights, mobile app, multi-market filings.
+This project is about making investment research more enjoyable through a better UX than the one provided by SEC.
 
 ---
 
@@ -40,6 +35,9 @@ npm install  # or yarn install / pnpm install
 npm run dev
 \`\`\`
 
+**Create a `.env.local` file** in the root of this project.
+Copy the contents of `.env.example` and configure your settings.
+
 Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
@@ -56,8 +54,4 @@ This project is **open-source** under the [MIT License](LICENSE). Contributions 
 
 ---
 
-## 🤝 Contribute
-Want to improve **Super-Investor**? Feel free to:  
-✅ **Fork the repo** & submit pull requests.  
-✅ **Suggest features** via Issues.  
-✅ **Share feedback** to help refine the experience.  
+...Work in progress...
