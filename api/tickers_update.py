@@ -68,4 +68,3 @@ except Exception as e:
 finally:
     cur.close()
     conn.close()
-    
