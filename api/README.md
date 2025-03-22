@@ -1,4 +1,4 @@
-# 📌 SEC Data Scraper Backend
+# 📌 Backend (SEC Data Scraper)
 
 ## 📌 Overview
 This project serves as the backend for an application responsible for **processing SEC (Securities and Exchange Commission) data**. It fetches financial filings and extracts relevant information from EDGAR (Electronic Data Gathering, Analysis, and Retrieval system).
@@ -53,7 +53,7 @@ Your backend will be available at: `http://127.0.0.1:8000`
 
 ## 📌 Notes
 - Ensure your `User-Agent` follows **SEC's guidelines** (include a name and contact email).
-- If `SEC_USER_AGENT` is missing, the backend **will not start**.
+- If `USER_AGENT` is missing, the backend **will not start**.
 
 ## 📝 License
 This project is licensed under the MIT License.
