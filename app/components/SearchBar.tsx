@@ -39,7 +39,7 @@ export function SearchBar({ onSearch, onStockSelect, searchResults }: SearchBarP
     };
 
     const handleStockSelect = (stock: Stock) => {
-        setQuery(stock.ticker ? `${stock.ticker} - ${stock.company_name}` : stock.company_name);
+        setQuery(stock.symbol ? `${stock.symbol} - ${stock.companyName}` : stock.companyName);
         setIsOpen(false);
         onStockSelect(stock);
     };
@@ -64,14 +64,14 @@ export function SearchBar({ onSearch, onStockSelect, searchResults }: SearchBarP
                 <div className="absolute w-full mt-2 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
                     {searchResults.map((stock) => (
                         <button
-                            key={`${stock.cik}-${stock.ticker ?? stock.company_name}`}
+                            key={`${stock.cik}-${stock.symbol ?? stock.companyName}`}
                             onClick={() => handleStockSelect(stock)}
                             className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3 group"
                         >
                             <TrendingUp className="h-5 w-5 text-gray-400 group-hover:text-blue-500" />
                             <div>
-                                <div className="font-medium text-gray-900">{stock.ticker ?? '—'}</div>
-                                <div className="text-sm text-gray-500">{stock.company_name}</div>
+                                <div className="font-medium text-gray-900">{stock.symbol ?? '—'}</div>
+                                <div className="text-sm text-gray-500">{stock.companyName}</div>
                             </div>
                         </button>
                     ))}

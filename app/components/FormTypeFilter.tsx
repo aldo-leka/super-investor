@@ -1,5 +1,5 @@
 import React from 'react';
-import { FormType } from '../types';
+import { FormType } from '@/types';
 
 interface FormTypeFilterProps {
     selectedType: FormType;

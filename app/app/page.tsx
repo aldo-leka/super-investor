@@ -1,19 +1,21 @@
 'use client';
 
-import { useState } from 'react';
-import { SearchBar } from '@/components/SearchBar';
-import { FilingList } from '@/components/FilingList';
-import { FilingViewer } from '@/components/FilingViewer';
-import { FormTypeFilter } from '@/components/FormTypeFilter';
-import { WelcomeGuide } from '@/components/WelcomeGuide';
-import { AuthModal } from '@/components/AuthModal';
-import { UserMenu } from '@/components/UserMenu';
-import { Filing, FormType, Note, Stock } from '@/types';
-import { mockFilings, mockNotes } from '@/lib/mockData';
+import {useState} from 'react';
+import {SearchBar} from '@/components/SearchBar';
+import {FilingList} from '@/components/FilingList';
+import {FilingViewer} from '@/components/FilingViewer';
+import {FormTypeFilter} from '@/components/FormTypeFilter';
+import {WelcomeGuide} from '@/components/WelcomeGuide';
+import {AuthModal} from '@/components/AuthModal';
+import {UserMenu} from '@/components/UserMenu';
+import {FilingApi, Filing, FormType, Note, StockApi, Stock} from '@/types';
+import {mockNotes} from '@/lib/mockData';
+import {BookOpen} from "lucide-react";
 
 export default function Home() {
     const [searchResults, setSearchResults] = useState<Stock[]>([]);
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+    const [filings, setFilings] = useState<Filing[]>([]);
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>(null);
     const [selectedFormType, setSelectedFormType] = useState<FormType>('ALL');
     const [notes, setNotes] = useState<Note[]>(mockNotes);
@@ -24,26 +26,31 @@ export default function Home() {
         setHasSearched(true);
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(query)}`);
-            const data: Stock[] = await res.json();
+            const rawData: StockApi[] = await res.json();
+            const data: Stock[] = rawData.map(item => ({
+                cik: item.cik,
+                symbol: item.ticker,
+                companyName: item.company_name
+            }));
 
             const results = data.sort((a, b) => {
                 const input = query.toLowerCase();
-                const aTicker = (a.ticker ?? '').toLowerCase();
-                const bTicker = (b.ticker ?? '').toLowerCase();
-                const aName = a.company_name.toLowerCase();
-                const bName = b.company_name.toLowerCase();
+                const aSymbol = (a.symbol ?? '').toLowerCase();
+                const bSymbol = (b.symbol ?? '').toLowerCase();
+                const aName = a.companyName.toLowerCase();
+                const bName = b.companyName.toLowerCase();
 
-                if (aTicker === input) return -1;
-                if (bTicker === input) return 1;
+                if (aSymbol === input) return -1;
+                if (bSymbol === input) return 1;
 
-                if (aTicker.startsWith(input) && !bTicker.startsWith(input)) return -1;
-                if (!aTicker.startsWith(input) && bTicker.startsWith(input)) return 1;
+                if (aSymbol.startsWith(input) && !bSymbol.startsWith(input)) return -1;
+                if (!aSymbol.startsWith(input) && bSymbol.startsWith(input)) return 1;
 
                 if (aName.startsWith(input) && !bName.startsWith(input)) return -1;
                 if (!aName.startsWith(input) && bName.startsWith(input)) return 1;
 
-                if (aTicker.includes(input) && !bTicker.includes(input)) return -1;
-                if (!aTicker.includes(input) && bTicker.includes(input)) return 1;
+                if (aSymbol.includes(input) && !bSymbol.includes(input)) return -1;
+                if (!aSymbol.includes(input) && bSymbol.includes(input)) return 1;
 
                 if (aName.includes(input) && !bName.includes(input)) return -1;
                 if (!aName.includes(input) && bName.includes(input)) return 1;
@@ -61,9 +68,28 @@ export default function Home() {
         setSelectedFiling(null);
     };
 
-    const handleStockSelect = (stock: Stock) => {
+    const handleStockSelect = async (stock: Stock) => {
         setSelectedStock(stock);
         setSearchResults([]);
+        setSelectedFiling(null);
+
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/filings/by-cik/${stock.cik}`);
+            const rawData: FilingApi[] = await res.json();
+
+            const data: Filing[] = rawData.map(item => ({
+                id: item.id,
+                symbol: stock.symbol,
+                companyName: stock.companyName,
+                formType: item.form_type,
+                filingDate: item.date_filed,
+                fileName: item.txt_filename
+            }));
+
+            setFilings(data);
+        } catch (error) {
+            console.error('Error fetching filings:', error);
+        }
     };
 
     const handleAddNote = (noteData: Omit<Note, 'id' | 'timestamp'>) => {
@@ -75,18 +101,15 @@ export default function Home() {
         setNotes(prev => [...prev, newNote]);
     };
 
-    const stockFilings = selectedStock
-        ? mockFilings.filter(filing => filing.symbol === selectedStock.ticker)
-        : [];
-
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="flex justify-between items-center mb-12">
+
                     <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 inline-block text-transparent bg-clip-text">
                         Super Investor
                     </h1>
-                    <UserMenu onAuthClick={() => setIsAuthModalOpen(true)} />
+                    <UserMenu onAuthClick={() => setIsAuthModalOpen(true)}/>
                 </div>
 
                 <div className="flex flex-col items-center mb-12">
@@ -97,20 +120,20 @@ export default function Home() {
                     />
                 </div>
 
-                {!hasSearched && <WelcomeGuide />}
+                {!hasSearched && <WelcomeGuide/>}
 
                 {selectedStock && !selectedFiling && (
                     <div className="space-y-8">
                         <div className="bg-white rounded-lg p-6 shadow-md">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedStock.company_name}</h2>
-                            <p className="text-gray-600">What do i put in here?</p>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedStock.companyName}</h2>
+                            <p className="text-gray-600"></p>
                         </div>
                         <FormTypeFilter
                             selectedType={selectedFormType}
                             onTypeSelect={setSelectedFormType}
                         />
                         <FilingList
-                            filings={stockFilings}
+                            filings={filings}
                             selectedFormType={selectedFormType}
                             onFilingSelect={setSelectedFiling}
                         />

@@ -163,7 +163,7 @@ def get_filings_by_cik(
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT form_type, date_filed, txt_filename, quarter
+            SELECT id, form_type, date_filed, txt_filename, quarter
             FROM edgar_filings
             WHERE cik = %s
             ORDER BY date_filed DESC
@@ -176,10 +176,11 @@ def get_filings_by_cik(
 
         return [
             {
-                "form_type": row[0],
-                "date_filed": row[1],
-                "txt_filename": row[2],
-                "quarter": row[3]
+                "id": row[0],
+                "form_type": row[1],
+                "date_filed": row[2],
+                "txt_filename": row[3],
+                "quarter": row[4]
             }
             for row in rows
         ]
