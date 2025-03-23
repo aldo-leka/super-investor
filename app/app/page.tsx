@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useState, useRef} from 'react';
 import {Search, FileText, Download, MessageSquare, Sparkles} from 'lucide-react';
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
@@ -260,9 +260,9 @@ export default function Home() {
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <div>
-                                        <CardTitle>{selectedFiling.title}</CardTitle>
+                                        <CardTitle>4 - Current Report</CardTitle>
                                         <CardDescription>
-                                            {selectedFiling.formType} - {selectedFiling.date}
+                                            {selectedFiling.formType} - {selectedFiling.filingDate}
                                         </CardDescription>
                                     </div>
                                     <div className="flex gap-2">

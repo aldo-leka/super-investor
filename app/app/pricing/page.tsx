@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Check, Sparkles } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
@@ -40,11 +39,12 @@ const plans = [
 ];
 
 export default function PricingPage() {
-    const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+    // const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
     const handleSubscribe = async (planName: string) => {
         // TODO: Implement Stripe checkout
-        setSelectedPlan(planName);
+        // setSelectedPlan(planName);
+        console.log(planName);
     };
 
     return (
