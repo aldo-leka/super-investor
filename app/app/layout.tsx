@@ -1,8 +1,6 @@
 import type {Metadata} from "next";
 import {Merriweather} from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
-import {StonksContextProvider} from "@/store/StonksContext";
 
 const merriweather = Merriweather({
     variable: "--font-merriweather",
@@ -22,13 +20,8 @@ export default function RootLayout(
 ) {
     return (
         <html lang="en">
-        <body
-            className={`${merriweather.className} antialiased`}
-        >
-        <StonksContextProvider>
-            <Navbar/>
+        <body className={`${merriweather.className} antialiased`}>
             {children}
-        </StonksContextProvider>
         </body>
         </html>
     );
