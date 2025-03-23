@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Filing, Note } from '../types';
 import { NoteEditor } from './NoteEditor';
 import { BookOpen, Type, Minus, Plus, MessageSquarePlus, X } from 'lucide-react';
@@ -185,7 +185,7 @@ export function FilingViewer({ filing, notes, onAddNote }: FilingViewerProps) {
                                                         onClick={() => scrollToNote(note)}
                                                     >
                                                         <p className="text-sm text-gray-500 italic mb-1">
-                                                            "{note.textSelection}"
+                                                            &quot;{note.textSelection}&quot;
                                                         </p>
                                                         <p className="text-gray-900 text-sm">{note.content}</p>
                                                     </div>
@@ -223,7 +223,7 @@ export function FilingViewer({ filing, notes, onAddNote }: FilingViewerProps) {
                                         onMouseLeave={() => setHoveredNote(null)}
                                     >
                                         <p className="text-sm text-gray-500 italic mb-2 line-clamp-2">
-                                            "{note.textSelection}"
+                                            &quot;{note.textSelection}&quot;
                                         </p>
                                         <p className="text-gray-900">{note.content}</p>
                                         <p className="text-xs text-gray-500 mt-2">

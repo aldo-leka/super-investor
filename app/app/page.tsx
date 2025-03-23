@@ -76,7 +76,7 @@ export default function Home() {
     };
 
     const stockFilings = selectedStock
-        ? mockFilings.filter(filing => filing.symbol === selectedStock.symbol)
+        ? mockFilings.filter(filing => filing.symbol === selectedStock.ticker)
         : [];
 
     return (

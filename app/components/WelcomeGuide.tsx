@@ -51,7 +51,7 @@ export function WelcomeGuide() {
                         bgColor: "bg-purple-50",
                         iconColor: "text-purple-600"
                     }
-                ].map((step, index) => (
+                ].map((step) => (
                     <div
                         key={step.step}
                         className={`${step.bgColor} rounded-2xl p-6 transform transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}
@@ -85,7 +85,6 @@ export function WelcomeGuide() {
                     </p>
                     <div className="flex justify-center gap-4">
                         <button
-                            onClick={() => document.querySelector('input[type="text"]')?.focus()}
                             className="bg-white text-blue-600 px-6 py-2 rounded-lg font-medium hover:bg-blue-50 transition-colors"
                         >
                             Start Searching

@@ -1,32 +1,4 @@
-import { Filing, Note, Stock } from '@/types';
-
-export const mockStocks: Stock[] = [
-    {
-        symbol: 'AAPL',
-        name: 'Apple Inc.',
-        description: 'Apple Inc. designs, manufactures and markets smartphones, personal computers, tablets, wearables and accessories, and sells various related services.'
-    },
-    {
-        symbol: 'MSFT',
-        name: 'Microsoft Corporation',
-        description: 'Microsoft Corporation develops, licenses, and supports software, services, devices, and solutions worldwide.'
-    },
-    {
-        symbol: 'TSLA',
-        name: 'Tesla, Inc.',
-        description: 'Tesla, Inc. designs, develops, manufactures, leases, and sells electric vehicles, and energy generation and storage systems.'
-    },
-    {
-        symbol: 'NVDA',
-        name: 'NVIDIA Corporation',
-        description: 'NVIDIA Corporation operates as a visual computing company worldwide, specializing in GPUs and AI technologies.'
-    },
-    {
-        symbol: 'META',
-        name: 'Meta Platforms, Inc.',
-        description: 'Meta Platforms, Inc. builds technologies that help people connect, find communities, and grow businesses through social media platforms.'
-    }
-];
+import { Filing, Note } from '@/types';
 
 export const mockFilings: Filing[] = [
     {

@@ -21,7 +21,7 @@ export function NoteEditor({ selectedText, onAddNote }: NoteEditorProps) {
             <h3 className="font-semibold text-gray-900 mb-2">Add Note</h3>
             {selectedText && (
                 <p className="text-sm text-gray-500 italic mb-2">
-                    Selected text: "{selectedText}"
+                    Selected text: &quot;{selectedText}&quot;
                 </p>
             )}
             <form onSubmit={handleSubmit}>
