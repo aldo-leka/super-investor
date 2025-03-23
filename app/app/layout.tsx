@@ -14,11 +14,11 @@ export const metadata: Metadata = {
     openGraph: {
         title: "Super Investor",
         description: "Analyze SEC filings with ease",
-        url: "https://superinvestor.pro",
+        url: "/",
         siteName: "Super Investor",
         images: [
             {
-                url: "https://superinvestor.pro/og-image.png",
+                url: "/og-image.png",
                 width: 1200,
                 height: 630,
                 alt: "Super Investor Preview",
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
         card: "summary_large_image",
         title: "Super Investor",
         description: "Analyze SEC filings with ease",
-        images: ["https://superinvestor.pro/og-image.png"],
+        images: ["/og-image.png"],
         creator: "@aldo_valueguy",
     },
 };
