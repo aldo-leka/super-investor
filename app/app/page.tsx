@@ -1,76 +1,95 @@
 'use client';
 
-import {useState} from 'react';
-import {SearchBar} from '@/components/SearchBar';
-import {FilingList} from '@/components/FilingList';
-import {FilingViewer} from '@/components/FilingViewer';
-import {FormTypeFilter} from '@/components/FormTypeFilter';
-import {WelcomeGuide} from '@/components/WelcomeGuide';
-import {AuthModal} from '@/components/AuthModal';
-import {UserMenu} from '@/components/UserMenu';
-import {FilingApi, Filing, FormType, Note, StockApi, Stock} from '@/types';
-import {mockNotes} from '@/lib/mockData';
-import {BookOpen} from "lucide-react";
+import React, {useState, useRef, useEffect} from 'react';
+import {Search, FileText, Download, MessageSquare, Sparkles} from 'lucide-react';
+import {Input} from "@/components/ui/input";
+import {Button} from "@/components/ui/button";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {Badge} from "@/components/ui/badge";
+import Link from 'next/link';
+import {useVirtualizer} from '@tanstack/react-virtual';
+import {Stock, StockApi, Filing, FilingApi} from "@/types";
+import {FILING_CATEGORIES, getFilingCategory} from "@/lib/getFilingCategory";
 
 export default function Home() {
+    const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<Stock[]>([]);
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [filings, setFilings] = useState<Filing[]>([]);
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>(null);
-    const [selectedFormType, setSelectedFormType] = useState<FormType>('ALL');
-    const [notes, setNotes] = useState<Note[]>(mockNotes);
-    const [hasSearched, setHasSearched] = useState(false);
-    const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-    const handleSearch = async (query: string) => {
-        setHasSearched(true);
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(query)}`);
-            const rawData: StockApi[] = await res.json();
-            const data: Stock[] = rawData.map(item => ({
-                cik: item.cik,
-                symbol: item.ticker,
-                companyName: item.company_name
-            }));
+    const parentRef = useRef<HTMLDivElement>(null);
 
-            const results = data.sort((a, b) => {
-                const input = query.toLowerCase();
-                const aSymbol = (a.symbol ?? '').toLowerCase();
-                const bSymbol = (b.symbol ?? '').toLowerCase();
-                const aName = a.companyName.toLowerCase();
-                const bName = b.companyName.toLowerCase();
+    const rowVirtualizer = useVirtualizer({
+        count: filings.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 72, // Estimated height of each filing row
+        overscan: 5,
+    });
 
-                if (aSymbol === input) return -1;
-                if (bSymbol === input) return 1;
+    const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const query = e.target.value;
+        setSearchQuery(query);
 
-                if (aSymbol.startsWith(input) && !bSymbol.startsWith(input)) return -1;
-                if (!aSymbol.startsWith(input) && bSymbol.startsWith(input)) return 1;
+        if (query.length >= 1) {
+            try {
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(query)}`);
+                const rawData: StockApi[] = await res.json();
+                const data: Stock[] = rawData.map(item => ({
+                    cik: item.cik,
+                    symbol: item.ticker,
+                    companyName: item.company_name
+                }));
 
-                if (aName.startsWith(input) && !bName.startsWith(input)) return -1;
-                if (!aName.startsWith(input) && bName.startsWith(input)) return 1;
+                const results = data.sort((a, b) => {
+                    const input = query.toLowerCase();
+                    const aSymbol = (a.symbol ?? '').toLowerCase();
+                    const bSymbol = (b.symbol ?? '').toLowerCase();
+                    const aName = a.companyName.toLowerCase();
+                    const bName = b.companyName.toLowerCase();
 
-                if (aSymbol.includes(input) && !bSymbol.includes(input)) return -1;
-                if (!aSymbol.includes(input) && bSymbol.includes(input)) return 1;
+                    if (aSymbol === input) return -1;
+                    if (bSymbol === input) return 1;
 
-                if (aName.includes(input) && !bName.includes(input)) return -1;
-                if (!aName.includes(input) && bName.includes(input)) return 1;
+                    if (aSymbol.startsWith(input) && !bSymbol.startsWith(input)) return -1;
+                    if (!aSymbol.startsWith(input) && bSymbol.startsWith(input)) return 1;
 
-                return aName.localeCompare(bName);
-            });
+                    if (aName.startsWith(input) && !bName.startsWith(input)) return -1;
+                    if (!aName.startsWith(input) && bName.startsWith(input)) return 1;
 
-            setSearchResults(results);
-        } catch (error) {
-            console.error('Error fetching search results:', error);
-            setSearchResults([]);
+                    if (aSymbol.includes(input) && !bSymbol.includes(input)) return -1;
+                    if (!aSymbol.includes(input) && bSymbol.includes(input)) return 1;
+
+                    if (aName.includes(input) && !bName.includes(input)) return -1;
+                    if (!aName.includes(input) && bName.includes(input)) return 1;
+
+                    return aName.localeCompare(bName);
+                });
+
+                setSearchResults(results);
+            } catch (error) {
+                console.error('Error fetching search results:', error);
+                setSearchResults([]);
+            }
         }
-
-        setSelectedStock(null);
-        setSelectedFiling(null);
     };
 
     const handleStockSelect = async (stock: Stock) => {
         setSelectedStock(stock);
-        setSearchResults([]);
         setSelectedFiling(null);
 
         try {
@@ -83,7 +102,8 @@ export default function Home() {
                 companyName: stock.companyName,
                 formType: item.form_type,
                 filingDate: item.date_filed,
-                fileName: item.txt_filename
+                fileName: item.txt_filename,
+                category: getFilingCategory(item.form_type)
             }));
 
             setFilings(data);
@@ -92,67 +112,189 @@ export default function Home() {
         }
     };
 
-    const handleAddNote = (noteData: Omit<Note, 'id' | 'timestamp'>) => {
-        const newNote: Note = {
-            ...noteData,
-            id: Math.random().toString(36).substr(2, 9),
-            timestamp: new Date().toISOString(),
-        };
-        setNotes(prev => [...prev, newNote]);
-    };
-
     return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-            <div className="max-w-7xl mx-auto px-4 py-8">
-                <div className="flex justify-between items-center mb-12">
-
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 inline-block text-transparent bg-clip-text">
-                        Super Investor
-                    </h1>
-                    <UserMenu onAuthClick={() => setIsAuthModalOpen(true)}/>
-                </div>
-
-                <div className="flex flex-col items-center mb-12">
-                    <SearchBar
-                        onSearch={handleSearch}
-                        onStockSelect={handleStockSelect}
-                        searchResults={searchResults}
-                    />
-                </div>
-
-                {!hasSearched && <WelcomeGuide/>}
-
-                {selectedStock && !selectedFiling && (
-                    <div className="space-y-8">
-                        <div className="bg-white rounded-lg p-6 shadow-md">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedStock.companyName}</h2>
-                            <p className="text-gray-600"></p>
-                        </div>
-                        <FormTypeFilter
-                            selectedType={selectedFormType}
-                            onTypeSelect={setSelectedFormType}
-                        />
-                        <FilingList
-                            filings={filings}
-                            selectedFormType={selectedFormType}
-                            onFilingSelect={setSelectedFiling}
-                        />
+        <div className="min-h-screen bg-background">
+            <header className="border-b">
+                <div className="container mx-auto px-4 py-4">
+                    <div className="flex items-center justify-between">
+                        <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <FileText className="h-6 w-6"/>
+                            Super Investor
+                        </h1>
+                        <Link href="/pricing">
+                            <Button>
+                                <Sparkles className="mr-2 h-4 w-4"/>
+                                Upgrade to Pro
+                            </Button>
+                        </Link>
                     </div>
-                )}
+                </div>
+            </header>
 
-                {selectedFiling && (
-                    <FilingViewer
-                        filing={selectedFiling}
-                        notes={notes}
-                        onAddNote={handleAddNote}
-                    />
-                )}
+            <main className="container mx-auto px-4 py-8">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    {/* Search Section */}
+                    <div className="md:col-span-4 space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Search Stocks</CardTitle>
+                                <CardDescription>
+                                    Enter a stock symbol or company name
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/>
+                                    <Input
+                                        type="search"
+                                        placeholder="Search stocks..."
+                                        className="pl-8"
+                                        value={searchQuery}
+                                        onChange={handleInputChange}
+                                    />
+                                </div>
 
-                <AuthModal
-                    isOpen={isAuthModalOpen}
-                    onClose={() => setIsAuthModalOpen(false)}
-                />
-            </div>
+                                {searchResults.length > 0 && (
+                                    <div className="mt-4 space-y-2">
+                                        {searchResults.map((stock) => (
+                                            <Button
+                                                key={stock.cik}
+                                                variant={selectedStock === stock ? "default" : "ghost"}
+                                                className="w-full justify-start"
+                                                onClick={() => handleStockSelect(stock)}
+                                            >
+                                                <div className="flex items-center gap-2 w-full">
+                                                    <span className="font-mono whitespace-nowrap">{stock.symbol}</span>
+                                                    <span className="text-muted-foreground truncate">
+                                                      {stock.companyName}
+                                                    </span>
+                                                </div>
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {selectedStock && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Available Filings ({filings.length})</CardTitle>
+                                    <CardDescription>
+                                        Filter and select filings to view
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Filter by category"/>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Categories</SelectItem>
+                                                {FILING_CATEGORIES.map((category) => (
+                                                    <SelectItem key={category} value={category}>
+                                                        {category}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+
+                                        <div
+                                            ref={parentRef}
+                                            className="h-[400px] overflow-auto"
+                                        >
+                                            <div
+                                                style={{
+                                                    height: `${rowVirtualizer.getTotalSize()}px`,
+                                                    width: '100%',
+                                                    position: 'relative',
+                                                }}
+                                            >
+                                                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                                                    const filing = filings[virtualRow.index];
+                                                    return (
+                                                        <div
+                                                            key={filing.id}
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: 0,
+                                                                left: 0,
+                                                                width: '100%',
+                                                                height: `${virtualRow.size}px`,
+                                                                transform: `translateY(${virtualRow.start}px)`,
+                                                            }}
+                                                        >
+                                                            <Button
+                                                                variant={selectedFiling?.id === filing.id ? "default" : "ghost"}
+                                                                className="w-full justify-start h-[68px] my-1"
+                                                                onClick={() => setSelectedFiling(filing)}
+                                                            >
+                                                                <div className="flex flex-col items-start">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-mono">{filing.formType}</span>
+                                                                        <span className="text-muted-foreground">
+                                      {filing.filingDate}
+                                    </span>
+                                                                    </div>
+                                                                    <span
+                                                                        className="text-xs text-muted-foreground truncate max-w-full">
+                                    {filing.category}
+                                  </span>
+                                                                </div>
+                                                            </Button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+
+                    {/* Filing Content Section */}
+                    <div className="md:col-span-8">
+                        {selectedFiling ? (
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                    <div>
+                                        <CardTitle>{selectedFiling.title}</CardTitle>
+                                        <CardDescription>
+                                            {selectedFiling.formType} - {selectedFiling.date}
+                                        </CardDescription>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" size="icon">
+                                            <Download className="h-4 w-4"/>
+                                        </Button>
+                                        <Button variant="outline" size="icon" asChild>
+                                            <Link href="/pricing">
+                                                <MessageSquare className="h-4 w-4"/>
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="mb-4">
+                                        <Badge variant="secondary">{selectedFiling.category}</Badge>
+                                    </div>
+                                    <div className="prose prose-sm max-w-none">
+                    <pre className="whitespace-pre-wrap font-mono text-sm">
+                      {/*{selectedFiling.content}*/} TEST
+                    </pre>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground">
+                                <p>Select a filing to view its contents</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </main>
         </div>
     );
 }

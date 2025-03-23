@@ -93,7 +93,7 @@ def seed_to_db():
 
             try:
                 execute_values(cur, """
-                    INSERT INTO public.edgar_filings (cik, company_name, form_type, date_filed, txt_filename, quarter)
+                    INSERT INTO edgar_filings (cik, company_name, form_type, date_filed, txt_filename, quarter)
                     VALUES %s
                     ON CONFLICT (txt_filename) DO NOTHING;
                 """, values)

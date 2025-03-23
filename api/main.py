@@ -46,11 +46,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 security = HTTPBearer()
 
+
 # Dependency to check Authorization header
 def verify_cron_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     if token != TICKER_API_SECRET:
         raise HTTPException(status_code=403, detail="Invalid token.")
+
 
 @app.post("/cron/update-tickers")
 def update_tickers(
@@ -110,6 +112,7 @@ def update_tickers(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+
 @app.get("/tickers/search")
 @limiter.limit("100/minute")
 def search_tickers(request: Request, q: str = Query(..., min_length=1, max_length=100)) -> List[dict]:
@@ -129,6 +132,7 @@ def search_tickers(request: Request, q: str = Query(..., min_length=1, max_lengt
             FROM tickers
             WHERE LOWER(company_name) LIKE LOWER(%s)
                OR LOWER(ticker) LIKE LOWER(%s)
+            ORDER BY (ticker IS NULL), company_name
             LIMIT 15;
         """, (f"%{q}%", f"%{q}%"))
 
@@ -148,8 +152,7 @@ def search_tickers(request: Request, q: str = Query(..., min_length=1, max_lengt
 @limiter.limit("60/minute")
 def get_filings_by_cik(
         request: Request,
-        cik: str,
-        limit: int = Query(100, gt=0, le=1000)  # Max 1000 results
+        cik: str
 ) -> List[dict]:
     try:
         parsed = urlparse(DATABASE_URL)
@@ -166,9 +169,8 @@ def get_filings_by_cik(
             SELECT id, form_type, date_filed, txt_filename, quarter
             FROM edgar_filings
             WHERE cik = %s
-            ORDER BY date_filed DESC
-            LIMIT %s;
-        """, (cik, limit))
+            ORDER BY date_filed DESC;
+        """, (cik,))
 
         rows = cur.fetchall()
         cur.close()
