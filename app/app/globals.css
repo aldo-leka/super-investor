@@ -123,28 +123,3 @@
     @apply bg-background text-foreground;
   }
 }
-
-.highlight-note {
-  @apply transition-all duration-300;
-}
-
-.filing-section {
-  @apply transition-all duration-300;
-}
-
-::selection {
-  @apply bg-blue-200;
-}
-
-@keyframes slide-up {
-  from {
-    transform: translateY(100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.3s ease-out forwards;
-}
