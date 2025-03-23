@@ -28,7 +28,9 @@ TICKER_API_SECRET = os.getenv("TICKER_API_SECRET")
 if not TICKER_API_SECRET:
     raise RuntimeError("TICKER_API_SECRET environment variable is not set. Please define it in your .env file.")
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS").split(",")
+if not ALLOWED_ORIGINS:
+    raise RuntimeError("ALLOWED_ORIGINS environment variable is not set. Please define it in your .env file.")
 
 app.add_middleware(
     CORSMiddleware,
@@ -140,3 +142,47 @@ def search_tickers(request: Request, q: str = Query(..., min_length=1, max_lengt
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
+
+
+@app.get("/filings/by-cik/{cik}")
+@limiter.limit("60/minute")
+def get_filings_by_cik(
+        request: Request,
+        cik: str,
+        limit: int = Query(100, gt=0, le=1000)  # Max 1000 results
+) -> List[dict]:
+    try:
+        parsed = urlparse(DATABASE_URL)
+        conn = psycopg2.connect(
+            dbname=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            host=parsed.hostname,
+            port=parsed.port
+        )
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT form_type, date_filed, txt_filename, quarter
+            FROM edgar_filings
+            WHERE cik = %s
+            ORDER BY date_filed DESC
+            LIMIT %s;
+        """, (cik, limit))
+
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        return [
+            {
+                "form_type": row[0],
+                "date_filed": row[1],
+                "txt_filename": row[2],
+                "quarter": row[3]
+            }
+            for row in rows
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching filings: {str(e)}")
