@@ -47,7 +47,7 @@ export default function Home() {
 
         if (query.length >= 1) {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(query)}`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(query)}&limit=${5}`);
                 const rawData: StockApi[] = await res.json();
                 const data: Stock[] = rawData.map(item => ({
                     cik: item.cik,
@@ -55,30 +55,44 @@ export default function Home() {
                     companyName: item.company_name
                 }));
 
-                const results = data.sort((a, b) => {
-                    const input = query.toLowerCase();
-                    const aSymbol = (a.symbol ?? '').toLowerCase();
-                    const bSymbol = (b.symbol ?? '').toLowerCase();
-                    const aName = a.companyName.toLowerCase();
-                    const bName = b.companyName.toLowerCase();
+                const results = data
+                    .sort((a, b) => {
+                        const input = query.toLowerCase();
 
-                    if (aSymbol === input) return -1;
-                    if (bSymbol === input) return 1;
+                        const aSymbol = (a.symbol ?? '').toLowerCase();
+                        const bSymbol = (b.symbol ?? '').toLowerCase();
+                        const aName = a.companyName.toLowerCase();
+                        const bName = b.companyName.toLowerCase();
 
-                    if (aSymbol.startsWith(input) && !bSymbol.startsWith(input)) return -1;
-                    if (!aSymbol.startsWith(input) && bSymbol.startsWith(input)) return 1;
+                        const aHasSymbol = a.symbol !== null;
+                        const bHasSymbol = b.symbol !== null;
 
-                    if (aName.startsWith(input) && !bName.startsWith(input)) return -1;
-                    if (!aName.startsWith(input) && bName.startsWith(input)) return 1;
+                        // Push null-symbol entries to the bottom
+                        if (!aHasSymbol && bHasSymbol) return 1;
+                        if (aHasSymbol && !bHasSymbol) return -1;
+                        if (!aHasSymbol && !bHasSymbol) return aName.localeCompare(bName); // fallback sort for nulls
 
-                    if (aSymbol.includes(input) && !bSymbol.includes(input)) return -1;
-                    if (!aSymbol.includes(input) && bSymbol.includes(input)) return 1;
+                        // Prioritize exact match
+                        if (aSymbol === input) return -1;
+                        if (bSymbol === input) return 1;
 
-                    if (aName.includes(input) && !bName.includes(input)) return -1;
-                    if (!aName.includes(input) && bName.includes(input)) return 1;
+                        // Starts with
+                        if (aSymbol.startsWith(input) && !bSymbol.startsWith(input)) return -1;
+                        if (!aSymbol.startsWith(input) && bSymbol.startsWith(input)) return 1;
 
-                    return aName.localeCompare(bName);
-                });
+                        if (aName.startsWith(input) && !bName.startsWith(input)) return -1;
+                        if (!aName.startsWith(input) && bName.startsWith(input)) return 1;
+
+                        // Includes
+                        if (aSymbol.includes(input) && !bSymbol.includes(input)) return -1;
+                        if (!aSymbol.includes(input) && bSymbol.includes(input)) return 1;
+
+                        if (aName.includes(input) && !bName.includes(input)) return -1;
+                        if (!aName.includes(input) && bName.includes(input)) return 1;
+
+                        // Final fallback alphabetical
+                        return aName.localeCompare(bName);
+                    });
 
                 setSearchResults(results);
             } catch (error) {

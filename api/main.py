@@ -115,7 +115,11 @@ def update_tickers(
 
 @app.get("/tickers/search")
 @limiter.limit("100/minute")
-def search_tickers(request: Request, q: str = Query(..., min_length=1, max_length=100)) -> List[dict]:
+def search_tickers(
+        request: Request,
+        q: str = Query(..., min_length=1, max_length=100),
+        limit: int = Query(15, gt=0, le=15)
+) -> List[dict]:
     try:
         parsed = urlparse(DATABASE_URL)
         conn = psycopg2.connect(
@@ -133,8 +137,8 @@ def search_tickers(request: Request, q: str = Query(..., min_length=1, max_lengt
             WHERE LOWER(company_name) LIKE LOWER(%s)
                OR LOWER(ticker) LIKE LOWER(%s)
             ORDER BY (ticker IS NULL), company_name
-            LIMIT 15;
-        """, (f"%{q}%", f"%{q}%"))
+            LIMIT %s;
+        """, (f"%{q}%", f"%{q}%", limit))
 
         rows = cur.fetchall()
         cur.close()
