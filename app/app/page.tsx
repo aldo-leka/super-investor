@@ -31,7 +31,7 @@ export default function Home() {
     const [filings, setFilings] = useState<Filing[]>([]);
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>(FILING_CATEGORIES[0]); // 'all'
-    const [filingContent, setFilingContent] = useState('');
+    const [filingContent, setFilingContent] = useState<Record<string, string>>({});
 
     const parentRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +118,18 @@ export default function Home() {
         } catch (error) {
             console.error('Error fetching filings:', error);
         }
+    };
+
+    const getFilingSections = (formType: string, content: Record<string, string>) => {
+        const keys = Object.keys(content);
+
+        const sectionMap: Record<string, string[]> = {
+            '8-K': keys.filter(k => k.startsWith('item_')),
+            '10-K': keys.filter(k => /^item_[0-9A-Z.]+$/.test(k) && !k.includes('item_1C')),
+            '10-Q': keys.filter(k => k.startsWith('part_') || k.startsWith('part_1_item_') || k.startsWith('part_2_item_')),
+        };
+
+        return sectionMap[formType] || [];
     };
 
     const handleFilingSelect = async (filing: Filing) => {
@@ -288,7 +300,7 @@ export default function Home() {
 
                     {/* Filing Content Section */}
                     <div className="md:col-span-8">
-                        {selectedFiling ? (
+                        {selectedFiling && filingContent ? (
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <div>
@@ -313,9 +325,15 @@ export default function Home() {
                                         <Badge variant="secondary">{selectedFiling.category}</Badge>
                                     </div>
                                     <div className="prose prose-sm max-w-none">
-                    <pre className="whitespace-pre-wrap font-mono text-sm">
-                        {filingContent}
-                    </pre>
+                    {/*<pre className="whitespace-pre-wrap font-mono text-sm">*/}
+                    {/*    {filingContent}*/}
+                    {/*</pre>*/}
+                                        {getFilingSections(selectedFiling.formType, filingContent).map((key) => (
+                                            <div key={key} className="bg-white rounded-lg shadow-md p-4">
+                                                <h3 className="text-lg font-bold capitalize mb-2">{key.replaceAll('_', ' ')}</h3>
+                                                <p className="text-gray-700 whitespace-pre-line">{filingContent[key]}</p>
+                                            </div>
+                                        ))}
                                     </div>
                                 </CardContent>
                             </Card>
