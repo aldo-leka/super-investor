@@ -31,15 +31,9 @@ export default function Home() {
     const [filings, setFilings] = useState<Filing[]>([]);
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [filingContent, setFilingContent] = useState('');
 
     const parentRef = useRef<HTMLDivElement>(null);
-
-    const rowVirtualizer = useVirtualizer({
-        count: filings.length,
-        getScrollElement: () => parentRef.current,
-        estimateSize: () => 72, // Estimated height of each filing row
-        overscan: 5,
-    });
 
     const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const query = e.target.value;
@@ -126,6 +120,29 @@ export default function Home() {
         }
     };
 
+    const handleFilingSelect = async (filing: Filing) => {
+        setSelectedFiling(filing);
+
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/filings/${filing.fileName}`);
+            const rawData = await res.text();
+            setFilingContent(rawData);
+        } catch (error) {
+            console.error('Error fetching filings:', error);
+        }
+    }
+
+    const filteredFilings = filings.filter(filing =>
+        selectedCategory === 'all' || filing.category === selectedCategory
+    );
+
+    const rowVirtualizer = useVirtualizer({
+        count: filteredFilings.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 72, // Estimated height of each filing row
+        overscan: 5,
+    });
+
     return (
         <div className="min-h-screen bg-background">
             <header className="border-b">
@@ -193,7 +210,7 @@ export default function Home() {
                         {selectedStock && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Available Filings ({filings.length})</CardTitle>
+                                    <CardTitle>Available Filings ({filteredFilings.length})</CardTitle>
                                     <CardDescription>
                                         Filter and select filings to view
                                     </CardDescription>
@@ -226,7 +243,7 @@ export default function Home() {
                                                 }}
                                             >
                                                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                                                    const filing = filings[virtualRow.index];
+                                                    const filing = filteredFilings[virtualRow.index];
                                                     return (
                                                         <div
                                                             key={filing.id}
@@ -242,11 +259,12 @@ export default function Home() {
                                                             <Button
                                                                 variant={selectedFiling?.id === filing.id ? "default" : "ghost"}
                                                                 className="w-full justify-start h-[68px] my-1"
-                                                                onClick={() => setSelectedFiling(filing)}
+                                                                onClick={() => handleFilingSelect(filing)}
                                                             >
                                                                 <div className="flex flex-col items-start">
                                                                     <div className="flex items-center gap-2">
-                                                                        <span className="font-mono">{filing.formType}</span>
+                                                                        <span
+                                                                            className="font-mono">{filing.formType}</span>
                                                                         <span className="text-muted-foreground">
                                       {filing.filingDate}
                                     </span>
@@ -296,7 +314,7 @@ export default function Home() {
                                     </div>
                                     <div className="prose prose-sm max-w-none">
                     <pre className="whitespace-pre-wrap font-mono text-sm">
-                      {/*{selectedFiling.content}*/} TEST
+                      {filingContent}
                     </pre>
                                     </div>
                                 </CardContent>

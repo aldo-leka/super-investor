@@ -1,13 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, Query, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from urllib.parse import urlparse
-from typing import List
 from requests.adapters import HTTPAdapter
 from requests.exceptions import (
     ConnectionError,
@@ -18,10 +9,8 @@ from requests.exceptions import (
 )
 from urllib3.util import Retry
 from bs4 import BeautifulSoup
-import psycopg2
 import requests
 import os
-import re
 
 # Python version compatibility for HTML parser
 try:
@@ -33,192 +22,11 @@ except ImportError:  # Python 3.5+
 
 load_dotenv()
 
-app = FastAPI()
-
 USER_AGENT = os.getenv("USER_AGENT")
-if not USER_AGENT:
-    raise RuntimeError("USER_AGENT environment variable is not set. Please define it in your .env file.")
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL environment variable is not set. Please define it in your .env file.")
-
-TICKER_API_SECRET = os.getenv("TICKER_API_SECRET")
-if not TICKER_API_SECRET:
-    raise RuntimeError("TICKER_API_SECRET environment variable is not set. Please define it in your .env file.")
-
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS").split(",")
-if not ALLOWED_ORIGINS:
-    raise RuntimeError("ALLOWED_ORIGINS environment variable is not set. Please define it in your .env file.")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[origin.strip() for origin in ALLOWED_ORIGINS],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-security = HTTPBearer()
-
-# Dependency to check Authorization header
-def verify_cron_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
-    if token != TICKER_API_SECRET:
-        raise HTTPException(status_code=403, detail="Invalid token.")
-
-
-@app.post("/cron/update-tickers")
-def update_tickers(
-        request: Request,
-        testing: bool = Query(False),
-        auth: HTTPAuthorizationCredentials = Depends(verify_cron_token)):
-    if testing:
-        return {"status": "success", "message": "Test mode: ticker update skipped."}
-
-    try:
-        response = requests.get(
-            "https://www.sec.gov/files/company_tickers.json",
-            headers={"User-agent": USER_AGENT},
-            timeout=10
-        )
-        response.raise_for_status()
-        data = response.json()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Fetch failed: {str(e)}")
-
-    # Parse data
-    sec_data = {
-        str(entry['cik_str']): {
-            "company_name": entry.get("title"),
-            "ticker": entry.get("ticker")
-        }
-        for entry in data.values()
-    }
-
-    # Insert/update to DB
-    try:
-        parsed = urlparse(DATABASE_URL)
-        conn = psycopg2.connect(
-            dbname=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            host=parsed.hostname,
-            port=parsed.port
-        )
-        cur = conn.cursor()
-
-        for cik, info in sec_data.items():
-            cur.execute("""
-                INSERT INTO tickers (cik, company_name, ticker)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (cik) DO UPDATE
-                SET company_name = EXCLUDED.company_name,
-                    ticker = EXCLUDED.ticker;
-            """, (cik, info["company_name"], info["ticker"]))
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return {"status": "success", "tickers_updated": len(sec_data)}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-
-@app.get("/tickers/search")
-@limiter.limit("100/minute")
-def search_tickers(
-        request: Request,
-        q: str = Query(..., min_length=1, max_length=100),
-        limit: int = Query(15, gt=0, le=15)
-) -> List[dict]:
-    try:
-        parsed = urlparse(DATABASE_URL)
-        conn = psycopg2.connect(
-            dbname=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            host=parsed.hostname,
-            port=parsed.port
-        )
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT cik, company_name, ticker
-            FROM tickers
-            WHERE LOWER(company_name) LIKE LOWER(%s)
-               OR LOWER(ticker) LIKE LOWER(%s)
-            ORDER BY (ticker IS NULL), company_name
-            LIMIT %s;
-        """, (f"%{q}%", f"%{q}%", limit))
-
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        return [
-            {"cik": row[0], "company_name": row[1], "ticker": row[2]}
-            for row in rows
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
-
-
-@app.get("/filings/by-cik/{cik}")
-@limiter.limit("60/minute")
-def get_filings_by_cik(
-        request: Request,
-        cik: str
-) -> List[dict]:
-    try:
-        parsed = urlparse(DATABASE_URL)
-        conn = psycopg2.connect(
-            dbname=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            host=parsed.hostname,
-            port=parsed.port
-        )
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT id, form_type, date_filed, txt_filename, quarter
-            FROM edgar_filings
-            WHERE cik = %s
-            ORDER BY date_filed DESC;
-        """, (cik,))
-
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-
-        return [
-            {
-                "id": row[0],
-                "form_type": row[1],
-                "date_filed": row[2],
-                "txt_filename": row[3],
-                "quarter": row[4]
-            }
-            for row in rows
-        ]
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching filings: {str(e)}")
-
-
-@app.get("/filings/{file_name:path}")
-@limiter.limit("60/minute")
 def get_filing(
-    request: Request,
-    file_name: str
-) -> HTMLResponse:
+        file_name: str
+) -> str:
     # replace the fileName from ending with ".txt" to "-index.html"
     html_index = f"https://www.sec.gov/Archives/{file_name.replace('.txt', '-index.html')}"
     # get the response from that url and make sure to use the retry logic with user agent
@@ -252,8 +60,8 @@ def get_filing(
     soup = BeautifulSoup(req.content, "lxml")
 
     # extract form description
-        # from "Form 13F-HR - Quarterly report filed by institutional managers, Holdings"
-        # to "Quarterly report filed by institutional managers"
+    # from "Form 13F-HR - Quarterly report filed by institutional managers, Holdings"
+    # to "Quarterly report filed by institutional managers"
     # extract filing date
     # extract period of report
     # extract state of incorporation
@@ -261,11 +69,11 @@ def get_filing(
     # extract Sector Industry Code (sic)
     # extract state location
     # extract tables for "Document Format Files" or "Data Format Files"
-        # extract link to get filing content from the table
-        # get the response from that url and make sure to use the retry logic with user agent
-        # feed the content to ExtractItems or HtmlStripper (figure it out)
-        # return the formatted json.
-        # see if it's good enough for most use cases otherwise return the raw html?
+    # extract link to get filing content from the table
+    # get the response from that url and make sure to use the retry logic with user agent
+    # feed the content to ExtractItems or HtmlStripper (figure it out)
+    # return the formatted json.
+    # see if it's good enough for most use cases otherwise return the raw html?
     # Crawl the soup for the financial files
     try:
         all_tables = soup.find_all("table")
@@ -289,7 +97,7 @@ def get_filing(
             for tr in table.find_all("tr")[1:]: # [1:] skips first item
                 # If it's the specific document type (e.g. 10-K)
                 if tr.contents[7].text in filing_types:
-# filing_type = tr.contents[7].text <-- Extract the type from the html
+                    # filing_type = tr.contents[7].text <-- Extract the type from the html
                     if tr.contents[5].contents[0].attrs["href"].split(".")[-1] in [
                         "htm",
                         "html",
@@ -302,11 +110,14 @@ def get_filing(
 
                 # Else get the complete submission text file
                 elif tr.contents[3].text == "Complete submission text file":
-# filing_type = series["Type"] <-- Extract the type from the html
+                    # filing_type = series["Type"] <-- Extract the type from the html
                     complete_text_file_link = (
                             "https://www.sec.gov" + tr.contents[5].contents[0].attrs["href"]
                     )
                     break
+
+            print(htm_file_link)
+            print(complete_text_file_link)
 
             # Prepare final link to download
             if htm_file_link is not None:
@@ -318,6 +129,8 @@ def get_filing(
 
             elif complete_text_file_link is not None:
                 link_to_download = complete_text_file_link
+
+            print(link_to_download)
 
             # If a valid link is available, initiate download
             if link_to_download is not None:
@@ -348,7 +161,7 @@ def get_filing(
                         print(f'Retries exceeded, could not download "{link_to_download}')
                         return None
 
-                    return HTMLResponse(content=req.text)
+                    return req.text
 
                 except (RequestException, HTTPError, ConnectionError, Timeout, RetryError) as err:
                     # If a network-related error occurs, log a debug message and return False
@@ -402,3 +215,16 @@ def requests_retry_session(
 
     # Return the session
     return session
+
+if __name__ == "__main__":
+    # edgar/data/320193/0001140361-25-005876.txt
+    html_content = get_filing("edgar/data/320193/0001140361-25-005876.txt")
+
+    if html_content:
+        output_path = "filing_output.txt"
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        print(f"Filing saved to {output_path}")
+    else:
+        print("Failed to fetch filing.")
