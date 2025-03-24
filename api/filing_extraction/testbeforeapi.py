@@ -9,8 +9,12 @@ from requests.exceptions import (
 )
 from urllib3.util import Retry
 from bs4 import BeautifulSoup
+from extract_items import ExtractItems
+from typing import Any, Dict
 import requests
 import os
+import re
+import json
 
 # Python version compatibility for HTML parser
 try:
@@ -76,6 +80,27 @@ def get_filing(
     # see if it's good enough for most use cases otherwise return the raw html?
     # Crawl the soup for the financial files
     try:
+        filing_type_text = soup.find("div", id="formName").find("strong").get_text(strip=True)
+        filing_type = re.search(r"Form\s+(.+)", filing_type_text).group(1)
+    except (HTMLParseError, Exception):
+        return None
+
+    filing_date = None
+    for group in soup.find_all("div", class_="formGrouping"):
+        labels = group.find_all("div", class_="infoHead")
+        values = group.find_all("div", class_="info")
+
+        for label, value in zip(labels, values):
+            if label.get_text(strip=True) == "Filing Date":
+                filing_date = value.get_text(strip=True)
+                break
+        if filing_date:
+            break
+
+    if filing_date is None:
+        return None
+
+    try:
         all_tables = soup.find_all("table")
     except (HTMLParseError, Exception):
         return None
@@ -91,13 +116,11 @@ def get_filing(
         # Get the htm/html/txt files
         if table.attrs["summary"] == "Document Format Files":
             htm_file_link, complete_text_file_link, link_to_download = None, None, None
-            filing_type = None
 
             # Iterate through rows to identify required links
             for tr in table.find_all("tr")[1:]: # [1:] skips first item
                 # If it's the specific document type (e.g. 10-K)
                 if tr.contents[7].text in filing_types:
-                    # filing_type = tr.contents[7].text <-- Extract the type from the html
                     if tr.contents[5].contents[0].attrs["href"].split(".")[-1] in [
                         "htm",
                         "html",
@@ -110,14 +133,10 @@ def get_filing(
 
                 # Else get the complete submission text file
                 elif tr.contents[3].text == "Complete submission text file":
-                    # filing_type = series["Type"] <-- Extract the type from the html
                     complete_text_file_link = (
                             "https://www.sec.gov" + tr.contents[5].contents[0].attrs["href"]
                     )
                     break
-
-            print(htm_file_link)
-            print(complete_text_file_link)
 
             # Prepare final link to download
             if htm_file_link is not None:
@@ -129,8 +148,6 @@ def get_filing(
 
             elif complete_text_file_link is not None:
                 link_to_download = complete_text_file_link
-
-            print(link_to_download)
 
             # If a valid link is available, initiate download
             if link_to_download is not None:
@@ -161,7 +178,16 @@ def get_filing(
                         print(f'Retries exceeded, could not download "{link_to_download}')
                         return None
 
-                    return req.text
+                    # return HTMLResponse(content=req.text)
+                    # Type, Date, filename, CIK, Company, Period of Report, SIC,
+                    # State of Inc, State location, Fiscal Year End, html_index,
+                    # htm_file_link, complete_text_file_link, filename
+                    metadata: Dict[str, Any] = {
+                        "Type": filing_type,
+                        "Date": filing_date,
+                        "filename": link_to_download
+                    }
+                    return ExtractItems(metadata, req.text).get_json()
 
                 except (RequestException, HTTPError, ConnectionError, Timeout, RetryError) as err:
                     # If a network-related error occurs, log a debug message and return False
@@ -218,12 +244,13 @@ def requests_retry_session(
 
 if __name__ == "__main__":
     # edgar/data/320193/0001140361-25-005876.txt
-    html_content = get_filing("edgar/data/320193/0001140361-25-005876.txt")
+    # html_content = get_filing("edgar/data/320193/0001140361-25-005876.txt")
+    json_content = get_filing("edgar/data/320193/0001047469-02-007674.txt")
 
-    if html_content:
-        output_path = "filing_output.txt"
+    if json_content:
+        output_path = "filing_output.json"
         with open(output_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
+            json.dump(json_content, f, indent=4)
 
         print(f"Filing saved to {output_path}")
     else:

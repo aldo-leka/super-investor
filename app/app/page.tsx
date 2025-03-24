@@ -30,7 +30,7 @@ export default function Home() {
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [filings, setFilings] = useState<Filing[]>([]);
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [selectedCategory, setSelectedCategory] = useState<string>(FILING_CATEGORIES[0]); // 'all'
     const [filingContent, setFilingContent] = useState('');
 
     const parentRef = useRef<HTMLDivElement>(null);
@@ -125,7 +125,7 @@ export default function Home() {
 
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/filings/${filing.fileName}`);
-            const rawData = await res.text();
+            const rawData = await res.json();
             setFilingContent(rawData);
         } catch (error) {
             console.error('Error fetching filings:', error);
@@ -218,7 +218,7 @@ export default function Home() {
                                 <CardContent>
                                     <div className="space-y-4">
                                         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                                            <SelectTrigger>
+                                            <SelectTrigger className="w-full">
                                                 <SelectValue placeholder="Filter by category"/>
                                             </SelectTrigger>
                                             <SelectContent>
@@ -314,7 +314,7 @@ export default function Home() {
                                     </div>
                                     <div className="prose prose-sm max-w-none">
                     <pre className="whitespace-pre-wrap font-mono text-sm">
-                      {filingContent}
+                        {filingContent}
                     </pre>
                                     </div>
                                 </CardContent>
