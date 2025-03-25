@@ -1,6 +1,6 @@
 'use client';
 
-import React, {useState, useRef} from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import {Search, FileText, Download, MessageSquare, Sparkles} from 'lucide-react';
 import {Input} from "@/components/ui/input";
 import {Button} from "@/components/ui/button";
@@ -23,6 +23,7 @@ import Link from 'next/link';
 import {useVirtualizer} from '@tanstack/react-virtual';
 import {Stock, StockApi, Filing, FilingApi} from "@/types";
 import {FILING_CATEGORIES, getFilingCategory} from "@/lib/getFilingCategory";
+import {itemMap} from '@/lib/utils'
 
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -35,13 +36,19 @@ export default function Home() {
 
     const parentRef = useRef<HTMLDivElement>(null);
 
-    const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const query = e.target.value;
-        setSearchQuery(query);
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchQuery(e.target.value);
+    };
 
-        if (query.length >= 1) {
+    useEffect(() => {
+        if (searchQuery.length < 1) {
+            setSearchResults([]);
+            return;
+        }
+
+        const timeoutId = setTimeout(async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(query)}&limit=${5}`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(searchQuery)}&limit=${5}`);
                 const rawData: StockApi[] = await res.json();
                 const data: Stock[] = rawData.map(item => ({
                     cik: item.cik,
@@ -51,7 +58,7 @@ export default function Home() {
 
                 const results = data
                     .sort((a, b) => {
-                        const input = query.toLowerCase();
+                        const input = searchQuery.toLowerCase();
 
                         const aSymbol = (a.symbol ?? '').toLowerCase();
                         const bSymbol = (b.symbol ?? '').toLowerCase();
@@ -93,8 +100,10 @@ export default function Home() {
                 console.error('Error fetching search results:', error);
                 setSearchResults([]);
             }
-        }
-    };
+        }, 200);
+
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery]);
 
     const handleStockSelect = async (stock: Stock) => {
         setSelectedStock(stock);
@@ -108,7 +117,11 @@ export default function Home() {
                 id: item.id,
                 symbol: stock.symbol,
                 companyName: stock.companyName,
-                formType: item.form_type,
+                formType: item.form_type === '8-K' && item.date_filed > '2004-08-23'
+                    ? '8-K'
+                    : item.form_type === '8-K'
+                        ? '8-K-OBSOLETE'
+                        : item.form_type,
                 filingDate: item.date_filed,
                 fileName: item.txt_filename,
                 category: getFilingCategory(item.form_type)
@@ -118,18 +131,6 @@ export default function Home() {
         } catch (error) {
             console.error('Error fetching filings:', error);
         }
-    };
-
-    const getFilingSections = (formType: string, content: Record<string, string>) => {
-        const keys = Object.keys(content);
-
-        const sectionMap: Record<string, string[]> = {
-            '8-K': keys.filter(k => k.startsWith('item_')),
-            '10-K': keys.filter(k => /^item_[0-9A-Z.]+$/.test(k) && !k.includes('item_1C')),
-            '10-Q': keys.filter(k => k.startsWith('part_') || k.startsWith('part_1_item_') || k.startsWith('part_2_item_')),
-        };
-
-        return sectionMap[formType] || [];
     };
 
     const handleFilingSelect = async (filing: Filing) => {
@@ -154,6 +155,10 @@ export default function Home() {
         estimateSize: () => 72, // Estimated height of each filing row
         overscan: 5,
     });
+
+    const normalizeKey = (key: string) => key.replace(/__/g, '_');
+    const filingType = selectedFiling?.formType ?? 'OTHER';
+    const items = itemMap[filingType] ?? itemMap['OTHER'];
 
     return (
         <div className="min-h-screen bg-background">
@@ -324,16 +329,24 @@ export default function Home() {
                                     <div className="mb-4">
                                         <Badge variant="secondary">{selectedFiling.category}</Badge>
                                     </div>
-                                    <div className="prose prose-sm max-w-none">
+                    {/*                <div className="prose prose-sm max-w-none">*/}
                     {/*<pre className="whitespace-pre-wrap font-mono text-sm">*/}
                     {/*    {filingContent}*/}
                     {/*</pre>*/}
-                                        {getFilingSections(selectedFiling.formType, filingContent).map((key) => (
-                                            <div key={key} className="bg-white rounded-lg shadow-md p-4">
-                                                <h3 className="text-lg font-bold capitalize mb-2">{key.replaceAll('_', ' ')}</h3>
-                                                <p className="text-gray-700 whitespace-pre-line">{filingContent[key]}</p>
-                                            </div>
-                                        ))}
+                    {/*                </div>*/}
+                                    <div className="space-y-6 mt-8">
+                                        {items.map((key) => {
+                                            const actualKey = normalizeKey(key);
+                                            const content = filingContent[actualKey];
+
+                                            if (!content || content.trim() === '') return null;
+
+                                            return (
+                                                <div key={key}>
+                                                    <p className="text-gray-700 whitespace-pre-line">{content}</p>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </CardContent>
                             </Card>

@@ -97,3 +97,7 @@ item_list_10q = [
     "part_2__6",
     "SIGNATURE",
 ]
+
+item_list_other = [
+    "content"
+]

@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Tuple
-from item_lists import item_list_8k, item_list_8k_obsolete, item_list_10k, item_list_10q
+from item_lists import item_list_8k, item_list_8k_obsolete, item_list_10k, item_list_10q, item_list_other
 from bs4 import BeautifulSoup
 from html.parser import HTMLParser
 import pandas as pd
@@ -70,10 +70,11 @@ class ExtractItems:
         elif self.filing_metadata["Type"] == "10-Q":
             items_list = item_list_10q
         else:
+            items_list = item_list_other
 # don't throw exception, figure out how to structure unsupported documents. Maybe return a {content:cleaned_html}
-            raise Exception(
-                f"Unsupported filing type: {self.filing_metadata['Type']}. No items_list defined."
-            )
+#             raise Exception(
+#                 f"Unsupported filing type: {self.filing_metadata['Type']}. No items_list defined."
+#             )
 
         self.items_list = items_list
 
@@ -166,6 +167,10 @@ class ExtractItems:
         # Extract the text from the document and clean it
         text = ExtractItems.strip_html(str(doc_report))
         text = ExtractItems.clean_text(text)
+
+        if self.filing_metadata["Type"] not in ["10-K", "10-Q", "8-K"]:
+            self.json_content["content"] = text
+            return None
 
         # For 10-Qs, need to separate the text into Part 1 and Part 2
         if self.filing_metadata["Type"] == "10-Q":

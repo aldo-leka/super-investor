@@ -1,7 +1,6 @@
-from fastapi import FastAPI, HTTPException, Depends, Header, Query, Request
+from fastapi import FastAPI, HTTPException, Depends, status, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -20,10 +19,15 @@ from urllib3.util import Retry
 from bs4 import BeautifulSoup
 from extract_items import ExtractItems
 from typing import Any, Dict
+from pydantic import BaseModel
+from datetime import datetime
 import psycopg2
 import requests
 import os
 import re
+import itertools
+import tempfile
+import zipfile
 
 # Python version compatibility for HTML parser
 try:
@@ -32,6 +36,13 @@ except ImportError:  # Python 3.5+
 
     class HTMLParseError(Exception):
         pass
+
+
+class HealthCheck(BaseModel):
+    """Response model to validate and return when performing a health check."""
+
+    status: str = "OK"
+
 
 load_dotenv()
 
@@ -74,7 +85,20 @@ def verify_cron_token(credentials: HTTPAuthorizationCredentials = Depends(securi
         raise HTTPException(status_code=403, detail="Invalid token.")
 
 
+@app.get(
+    "/health",
+    tags=["healthcheck"],
+    summary="Perform a Health Check",
+    response_description="Return HTTP Status Code 200 (OK)",
+    status_code=status.HTTP_200_OK,
+    response_model=HealthCheck,
+)
+def get_health() -> HealthCheck:
+    return HealthCheck(status="OK")
+
+
 @app.post("/cron/update-tickers")
+@limiter.limit("1/hour")
 def update_tickers(
         request: Request,
         testing: bool = Query(False),
@@ -133,8 +157,93 @@ def update_tickers(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+@app.post("/cron/update-edgar-filings")
+# @limiter.limit("1/hour")
+def update_edgar_filings(
+        request: Request,
+        testing: bool = Query(False),
+        auth: HTTPAuthorizationCredentials = Depends(verify_cron_token)
+):
+    if testing:
+        return {"status": "success", "message": "Test mode: filing update skipped."}
+
+    parsed = urlparse(DATABASE_URL)
+    try:
+        conn = psycopg2.connect(
+            dbname=parsed.path[1:],
+            user=parsed.username,
+            password=parsed.password,
+            host=parsed.hostname,
+            port=parsed.port
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
+
+    cur = conn.cursor()
+
+    now = datetime.utcnow()
+    year = now.year
+    quarter = (now.month - 1) // 3 + 1
+    quarter_key = f"{year}_QTR{quarter}"
+
+    url = f"https://www.sec.gov/Archives/edgar/full-index/{year}/QTR{quarter}/master.zip"
+
+    try:
+        with tempfile.TemporaryFile(mode="w+b") as tmp:
+            retries_exceeded = True
+            for _ in range(5):
+                session = requests.Session()
+                req = requests_retry_session(
+                    retries=5, backoff_factor=0.2, session=session
+                ).get(url=url, headers=USER_AGENT)
+
+                if "will be managed until action is taken to declare your traffic." not in req.text:
+                    retries_exceeded = False
+                    break
+
+            if retries_exceeded:
+                return {"status": "error", "message": f"Retries exceeded for {url}"}
+
+            tmp.write(req.content)
+            tmp.seek(0)
+
+            with zipfile.ZipFile(tmp).open("master.idx") as f:
+                lines = [
+                    line.decode("latin-1")
+                    for line in itertools.islice(f, 11, None)
+                ]
+                entries = [line.strip().split("|") for line in lines if len(line.strip().split("|")) == 5]
+
+        inserted = 0
+        for entry in entries:
+            cik, company_name, form_type, date_filed, txt_filename = entry
+            try:
+                cur.execute("""
+                    INSERT INTO edgar_filings (cik, company_name, form_type, date_filed, txt_filename, quarter)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (txt_filename) DO NOTHING
+                """, (cik, company_name, form_type, date_filed, txt_filename, quarter_key))
+                inserted += 1
+            except Exception:
+                continue
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {
+            "status": "success",
+            "quarter": quarter_key,
+            "filings_inserted": inserted,
+            "timestamp": now.isoformat()
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": f"Download or processing failed: {str(e)}"}
+
+
 @app.get("/tickers/search")
-@limiter.limit("100/minute")
+@limiter.limit("300/minute")
 def search_tickers(
         request: Request,
         q: str = Query(..., min_length=1, max_length=100),
@@ -256,18 +365,13 @@ def get_filing(
     # extract form description
         # from "Form 13F-HR - Quarterly report filed by institutional managers, Holdings"
         # to "Quarterly report filed by institutional managers"
+    # extract filing type
     # extract filing date
-    # extract period of report
-    # extract state of incorporation
-    # extract fiscal year end
-    # extract Sector Industry Code (sic)
-    # extract state location
     # extract tables for "Document Format Files" or "Data Format Files"
         # extract link to get filing content from the table
         # get the response from that url and make sure to use the retry logic with user agent
-        # feed the content to ExtractItems or HtmlStripper (figure it out)
+        # feed the content to ExtractItems or HtmlStripper
         # return the formatted json.
-        # see if it's good enough for most use cases otherwise return the raw html?
     # Crawl the soup for the financial files
     try:
         filing_type_text = soup.find("div", id="formName").find("strong").get_text(strip=True)
@@ -368,10 +472,6 @@ def get_filing(
                         print(f'Retries exceeded, could not download "{link_to_download}')
                         return None
 
-                    # return HTMLResponse(content=req.text)
-                    # Type, Date, filename, CIK, Company, Period of Report, SIC,
-                    # State of Inc, State location, Fiscal Year End, html_index,
-                    # htm_file_link, complete_text_file_link, filename
                     metadata: Dict[str, Any] = {
                         "Type": filing_type,
                         "Date": filing_date,
