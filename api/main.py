@@ -21,6 +21,7 @@ from extract_items import ExtractItems
 from typing import Any, Dict
 from pydantic import BaseModel
 from datetime import datetime
+from psycopg2.extras import execute_values
 import psycopg2
 import requests
 import os
@@ -195,7 +196,7 @@ def update_edgar_filings(
                 session = requests.Session()
                 req = requests_retry_session(
                     retries=5, backoff_factor=0.2, session=session
-                ).get(url=url, headers=USER_AGENT)
+                ).get(url=url, headers={"User-agent": USER_AGENT})
 
                 if "will be managed until action is taken to declare your traffic." not in req.text:
                     retries_exceeded = False
@@ -214,18 +215,20 @@ def update_edgar_filings(
                 ]
                 entries = [line.strip().split("|") for line in lines if len(line.strip().split("|")) == 5]
 
-        inserted = 0
-        for entry in entries:
-            cik, company_name, form_type, date_filed, txt_filename = entry
-            try:
-                cur.execute("""
-                    INSERT INTO edgar_filings (cik, company_name, form_type, date_filed, txt_filename, quarter)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (txt_filename) DO NOTHING
-                """, (cik, company_name, form_type, date_filed, txt_filename, quarter_key))
-                inserted += 1
-            except Exception:
-                continue
+        data = [
+            (cik, company_name, form_type, date_filed, txt_filename, quarter_key)
+            for cik, company_name, form_type, date_filed, txt_filename in entries
+        ]
+
+        execute_values(
+            cur,
+            """
+            INSERT INTO edgar_filings (cik, company_name, form_type, date_filed, txt_filename, quarter)
+            VALUES %s
+            ON CONFLICT (txt_filename) DO NOTHING
+            """,
+            data
+        )
 
         conn.commit()
         cur.close()
@@ -233,8 +236,8 @@ def update_edgar_filings(
 
         return {
             "status": "success",
+            "filings_processed": len(data),
             "quarter": quarter_key,
-            "filings_inserted": inserted,
             "timestamp": now.isoformat()
         }
 

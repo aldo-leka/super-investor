@@ -4,6 +4,7 @@ from collections import Counter
 
 MASTER_DIR = "masterdatadownload"  # or full path if needed
 
+
 def parse_master_idx(file_path):
     with open(file_path, "rb") as f:
         lines = [
@@ -12,6 +13,7 @@ def parse_master_idx(file_path):
             if "|" in line.decode("latin-1")
         ]
         return [line.split("|")[4] for line in lines]  # txt_filename is the 5th field
+
 
 def collect_all_filenames():
     all_filenames = []
@@ -27,6 +29,7 @@ def collect_all_filenames():
                     print(f"⚠️ Failed to read {idx_path}: {e}")
 
     return all_filenames
+
 
 def main():
     print("🔍 Scanning all master.idx files...")
@@ -44,6 +47,7 @@ def main():
         print("🚨 Duplicate filenames:")
         for fname in duplicates:
             print(f"- {fname} (count: {counts[fname]})")
+
 
 if __name__ == "__main__":
     main()
