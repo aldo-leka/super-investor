@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight, CheckCircle2, Play } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -102,10 +103,13 @@ export function Hero() {
 
                     {/* Right side image */}
                     <div className="relative">
-                        <img
+                        <Image
                             src="/dashboard-preview.png"
                             alt="SEC filing analysis dashboard"
+                            width={800}
+                            height={600}
                             className="rounded-lg shadow-2xl"
+                            priority
                         />
                         <div className="absolute -bottom-4 -right-4 bg-white rounded-lg p-4 shadow-lg">
                             <div className="text-sm font-medium">Latest Filing Alert</div>

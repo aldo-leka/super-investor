@@ -2,6 +2,7 @@
 
 import {Play} from 'lucide-react';
 import {Button} from "@/components/ui/button";
+import Image from 'next/image';
 
 export function FoundersStory() {
     return (
@@ -10,17 +11,18 @@ export function FoundersStory() {
                 <div className="max-w-4xl mx-auto">
                     <div className="grid md:grid-cols-2 gap-12 items-center">
                         <div>
-                            <div className="rounded-xl overflow-hidden mb-6">
-                                <img
+                            <div className="rounded-xl overflow-hidden mb-6 relative aspect-[4/3]">
+                                <Image
                                     src="https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80"
                                     alt="Founder"
-                                    className="w-full h-auto"
+                                    fill
+                                    className="object-cover"
                                 />
                             </div>
                         </div>
                         <div>
                             <h2 className="text-3xl font-bold mb-2">
-                                heyo! It's Aldo
+                                heyo! It&apos;s Aldo
                                 <span className="text-muted-foreground font-normal text-lg"> (the guy who made Super Investor)</span>
                             </h2>
                             <div className="space-y-4 text-lg">
@@ -35,10 +37,10 @@ export function FoundersStory() {
                                 </p>
                                 <p>
                                     So I built Super Investor for myself, but it turns out many others had the same
-                                    problem. That's how Super Investor was born.
+                                    problem. That&apos;s how Super Investor was born.
                                 </p>
                                 <p>
-                                    I've since used Super Investor daily to analyze hundreds of companies - which has
+                                    I&apos;ve since used Super Investor daily to analyze hundreds of companies - which has
                                     helped me and other investors make better investment decisions at an <span className="underline">unbeatable price</span>.
                                 </p>
                             </div>

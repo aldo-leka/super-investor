@@ -1,18 +1,19 @@
 'use client';
 
-import React, {useState} from 'react';
-import {Stock, Filing} from '@/types';
-import {useStockSearch} from '@/lib/hooks/useStockSearch';
-import {fetchFilingsByStock} from '@/lib/hooks/useFilings';
+import React, { useState } from 'react';
+import { Stock, Filing } from '@/types';
+import { useStockSearch } from '@/lib/hooks/useStockSearch';
+import { fetchFilingsByStock } from '@/lib/hooks/useFilings';
 import SearchPanel from '@/components/dashboard/SearchPanel';
 import FilingListPanel from '@/components/dashboard/FilingListPanel';
 import FilingViewer from '@/components/dashboard/FilingViewer';
-import {FileText, Sparkles} from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import {Button} from "@/components/ui/button";
-import {FILING_CATEGORIES} from "@/lib/filingUtils";
+import { Button } from "@/components/ui/button";
+import { FILING_CATEGORIES } from "@/lib/filingUtils";
+import { Logo } from '@/components/Logo';
 
-export default function Home() {
+export default function DashboardPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [filings, setFilings] = useState<Filing[]>([]);
@@ -45,13 +46,10 @@ export default function Home() {
             <header className="border-b">
                 <div className="container mx-auto px-4 py-4">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-2xl font-bold flex items-center gap-2">
-                            <FileText className="h-6 w-6"/>
-                            Super Investor
-                        </h1>
+                        <Logo />
                         <Link href="/pricing">
                             <Button>
-                                <Sparkles className="mr-2 h-4 w-4"/>
+                                <Sparkles className="mr-2 h-4 w-4" />
                                 Upgrade to Pro
                             </Button>
                         </Link>

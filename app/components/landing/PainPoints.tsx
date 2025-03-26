@@ -41,7 +41,7 @@ export function PainPoints() {
             <div className="container mx-auto px-4">
                 <div className="max-w-3xl mx-auto text-center mb-16">
                     <h2 className="text-4xl font-bold mb-4">
-                        SEC research shouldn't be this <span className="text-red-500">painful</span>
+                        SEC research shouldn&apos;t be this <span className="text-red-500">painful</span>
                     </h2>
                     <p className="text-xl text-muted-foreground">
                         Stop wrestling with these common frustrations
