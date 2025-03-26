@@ -1,141 +1,36 @@
 'use client';
 
-import React, {useState, useRef, useEffect} from 'react';
-import {Search, FileText, Download, MessageSquare, Sparkles} from 'lucide-react';
-import {Input} from "@/components/ui/input";
-import {Button} from "@/components/ui/button";
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
-import {Badge} from "@/components/ui/badge";
+import React, {useState} from 'react';
+import {Stock, Filing} from '@/types';
+import {useStockSearch} from '@/lib/hooks/useStockSearch';
+import {fetchFilingsByStock} from '@/lib/hooks/useFilings';
+import SearchPanel from '@/components/SearchPanel';
+import FilingListPanel from '@/components/FilingListPanel';
+import FilingViewer from '@/components/FilingViewer';
+import {FileText, Sparkles} from 'lucide-react';
 import Link from 'next/link';
-import {useVirtualizer} from '@tanstack/react-virtual';
-import {Stock, StockApi, Filing, FilingApi} from "@/types";
-import {FILING_CATEGORIES, getFilingCategory} from "@/lib/getFilingCategory";
-import {itemMap} from '@/lib/utils'
+import {Button} from "@/components/ui/button";
+import {FILING_CATEGORIES} from "@/lib/filingUtils";
 
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<Stock[]>([]);
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [filings, setFilings] = useState<Filing[]>([]);
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string>(FILING_CATEGORIES[0]); // 'all'
     const [filingContent, setFilingContent] = useState<Record<string, string>>({});
 
-    const parentRef = useRef<HTMLDivElement>(null);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchQuery(e.target.value);
-    };
-
-    useEffect(() => {
-        if (searchQuery.length < 1) {
-            setSearchResults([]);
-            return;
-        }
-
-        const timeoutId = setTimeout(async () => {
-            try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(searchQuery)}&limit=${5}`);
-                const rawData: StockApi[] = await res.json();
-                const data: Stock[] = rawData.map(item => ({
-                    cik: item.cik,
-                    symbol: item.ticker,
-                    companyName: item.company_name
-                }));
-
-                const results = data
-                    .sort((a, b) => {
-                        const input = searchQuery.toLowerCase();
-
-                        const aSymbol = (a.symbol ?? '').toLowerCase();
-                        const bSymbol = (b.symbol ?? '').toLowerCase();
-                        const aName = a.companyName.toLowerCase();
-                        const bName = b.companyName.toLowerCase();
-
-                        const aHasSymbol = a.symbol !== null;
-                        const bHasSymbol = b.symbol !== null;
-
-                        // Push null-symbol entries to the bottom
-                        if (!aHasSymbol && bHasSymbol) return 1;
-                        if (aHasSymbol && !bHasSymbol) return -1;
-                        if (!aHasSymbol && !bHasSymbol) return aName.localeCompare(bName); // fallback sort for nulls
-
-                        // Prioritize exact match
-                        if (aSymbol === input) return -1;
-                        if (bSymbol === input) return 1;
-
-                        // Starts with
-                        if (aSymbol.startsWith(input) && !bSymbol.startsWith(input)) return -1;
-                        if (!aSymbol.startsWith(input) && bSymbol.startsWith(input)) return 1;
-
-                        if (aName.startsWith(input) && !bName.startsWith(input)) return -1;
-                        if (!aName.startsWith(input) && bName.startsWith(input)) return 1;
-
-                        // Includes
-                        if (aSymbol.includes(input) && !bSymbol.includes(input)) return -1;
-                        if (!aSymbol.includes(input) && bSymbol.includes(input)) return 1;
-
-                        if (aName.includes(input) && !bName.includes(input)) return -1;
-                        if (!aName.includes(input) && bName.includes(input)) return 1;
-
-                        // Final fallback alphabetical
-                        return aName.localeCompare(bName);
-                    });
-
-                setSearchResults(results);
-            } catch (error) {
-                console.error('Error fetching search results:', error);
-                setSearchResults([]);
-            }
-        }, 200);
-
-        return () => clearTimeout(timeoutId);
-    }, [searchQuery]);
+    const searchResults = useStockSearch(searchQuery);
 
     const handleStockSelect = async (stock: Stock) => {
         setSelectedStock(stock);
         setSelectedFiling(null);
-
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/filings/by-cik/${stock.cik}`);
-            const rawData: FilingApi[] = await res.json();
-
-            const data: Filing[] = rawData.map(item => ({
-                id: item.id,
-                symbol: stock.symbol,
-                companyName: stock.companyName,
-                formType: item.form_type === '8-K' && item.date_filed > '2004-08-23'
-                    ? '8-K'
-                    : item.form_type === '8-K'
-                        ? '8-K-OBSOLETE'
-                        : item.form_type,
-                filingDate: item.date_filed,
-                fileName: item.txt_filename,
-                category: getFilingCategory(item.form_type)
-            }));
-
-            setFilings(data);
-        } catch (error) {
-            console.error('Error fetching filings:', error);
-        }
+        const data = await fetchFilingsByStock(stock);
+        setFilings(data);
     };
 
     const handleFilingSelect = async (filing: Filing) => {
         setSelectedFiling(filing);
-
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/filings/${filing.fileName}`);
             const rawData = await res.json();
@@ -143,22 +38,7 @@ export default function Home() {
         } catch (error) {
             console.error('Error fetching filings:', error);
         }
-    }
-
-    const filteredFilings = filings.filter(filing =>
-        selectedCategory === 'all' || filing.category === selectedCategory
-    );
-
-    const rowVirtualizer = useVirtualizer({
-        count: filteredFilings.length,
-        getScrollElement: () => parentRef.current,
-        estimateSize: () => 72, // Estimated height of each filing row
-        overscan: 5,
-    });
-
-    const normalizeKey = (key: string) => key.replace(/__/g, '_');
-    const filingType = selectedFiling?.formType ?? 'OTHER';
-    const items = itemMap[filingType] ?? itemMap['OTHER'];
+    };
 
     return (
         <div className="min-h-screen bg-background">
@@ -178,183 +58,33 @@ export default function Home() {
                     </div>
                 </div>
             </header>
-
-            <main className="container mx-auto px-4 py-8">
+            <main className="container mx-auto px-4 py-6">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    {/* Search Section */}
                     <div className="md:col-span-4 space-y-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Search Stocks</CardTitle>
-                                <CardDescription>
-                                    Enter a stock symbol or company name
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="relative">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground"/>
-                                    <Input
-                                        type="search"
-                                        placeholder="Search stocks..."
-                                        className="pl-8"
-                                        value={searchQuery}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-
-                                {searchResults.length > 0 && (
-                                    <div className="mt-4 space-y-2">
-                                        {searchResults.map((stock) => (
-                                            <Button
-                                                key={stock.cik}
-                                                variant={selectedStock === stock ? "default" : "ghost"}
-                                                className="w-full justify-start"
-                                                onClick={() => handleStockSelect(stock)}
-                                            >
-                                                <div className="flex items-center gap-2 w-full">
-                                                    <span className="font-mono whitespace-nowrap">{stock.symbol}</span>
-                                                    <span className="text-muted-foreground truncate">
-                                                      {stock.companyName}
-                                                    </span>
-                                                </div>
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
+                        <SearchPanel
+                            query={searchQuery}
+                            onQueryChange={setSearchQuery}
+                            results={searchResults}
+                            onSelect={handleStockSelect}
+                            selectedStock={selectedStock}
+                        />
                         {selectedStock && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Available Filings ({filteredFilings.length})</CardTitle>
-                                    <CardDescription>
-                                        Filter and select filings to view
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-4">
-                                        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                                            <SelectTrigger className="w-full">
-                                                <SelectValue placeholder="Filter by category"/>
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All Categories</SelectItem>
-                                                {FILING_CATEGORIES.map((category) => (
-                                                    <SelectItem key={category} value={category}>
-                                                        {category}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-
-                                        <div
-                                            ref={parentRef}
-                                            className="h-[400px] overflow-auto"
-                                        >
-                                            <div
-                                                style={{
-                                                    height: `${rowVirtualizer.getTotalSize()}px`,
-                                                    width: '100%',
-                                                    position: 'relative',
-                                                }}
-                                            >
-                                                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                                                    const filing = filteredFilings[virtualRow.index];
-                                                    return (
-                                                        <div
-                                                            key={filing.id}
-                                                            style={{
-                                                                position: 'absolute',
-                                                                top: 0,
-                                                                left: 0,
-                                                                width: '100%',
-                                                                height: `${virtualRow.size}px`,
-                                                                transform: `translateY(${virtualRow.start}px)`,
-                                                            }}
-                                                        >
-                                                            <Button
-                                                                variant={selectedFiling?.id === filing.id ? "default" : "ghost"}
-                                                                className="w-full justify-start h-[68px] my-1"
-                                                                onClick={() => handleFilingSelect(filing)}
-                                                            >
-                                                                <div className="flex flex-col items-start">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span
-                                                                            className="font-mono">{filing.formType}</span>
-                                                                        <span className="text-muted-foreground">
-                                      {filing.filingDate}
-                                    </span>
-                                                                    </div>
-                                                                    <span
-                                                                        className="text-xs text-muted-foreground truncate max-w-full">
-                                    {filing.category}
-                                  </span>
-                                                                </div>
-                                                            </Button>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <FilingListPanel
+                                filings={filings}
+                                selectedFiling={selectedFiling}
+                                onSelectFiling={handleFilingSelect}
+                                selectedCategory={selectedCategory}
+                                onCategoryChange={setSelectedCategory}
+                            />
                         )}
                     </div>
 
-                    {/* Filing Content Section */}
                     <div className="md:col-span-8">
-                        {selectedFiling && filingContent ? (
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <div>
-                                        <CardTitle>4 - Current Report</CardTitle>
-                                        <CardDescription>
-                                            {selectedFiling.formType} - {selectedFiling.filingDate}
-                                        </CardDescription>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="icon">
-                                            <Download className="h-4 w-4"/>
-                                        </Button>
-                                        <Button variant="outline" size="icon" asChild>
-                                            <Link href="/pricing">
-                                                <MessageSquare className="h-4 w-4"/>
-                                            </Link>
-                                        </Button>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="mb-4">
-                                        <Badge variant="secondary">{selectedFiling.category}</Badge>
-                                    </div>
-                    {/*                <div className="prose prose-sm max-w-none">*/}
-                    {/*<pre className="whitespace-pre-wrap font-mono text-sm">*/}
-                    {/*    {filingContent}*/}
-                    {/*</pre>*/}
-                    {/*                </div>*/}
-                                    <div className="space-y-6 mt-8">
-                                        {items.map((key) => {
-                                            const actualKey = normalizeKey(key);
-                                            const content = filingContent[actualKey];
-
-                                            if (!content || content.trim() === '') return null;
-
-                                            return (
-                                                <div key={key}>
-                                                    <p className="text-gray-700 whitespace-pre-line">{content}</p>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-muted-foreground">
-                                <p>Select a filing to view its contents</p>
-                            </div>
-                        )}
+                        <FilingViewer
+                            filing={selectedFiling}
+                            content={filingContent}
+                            category={selectedFiling?.category || ''}
+                        />
                     </div>
                 </div>
             </main>
