@@ -1,54 +1,37 @@
-import subprocess
+import psutil
 import os
-import signal
 
-PROJECT_KEYWORDS = ["super-investor", "fastapi.exe", "spawn_main"]
-CONFIRM_BEFORE_KILL = True  # Set to False to auto-kill without confirmation
+# Safer keywords — for Python-based FastAPI/dev servers only
+keywords = [
+    "main.py",
+    "fastapi",
+    "spawn_main"
+]
 
+current_pid = os.getpid()
+killed = []
 
-def list_python_processes():
-    result = subprocess.run(['wmic', 'process', 'where', 'caption="python.exe"', 'get', 'ProcessId,CommandLine'],
-                            capture_output=True, text=True)
-    lines = result.stdout.strip().splitlines()[1:]  # Skip header
-    processes = []
-
-    for line in lines:
-        if not line.strip():
-            continue
-        parts = line.rsplit(' ', 1)
-        if len(parts) == 2:
-            cmd, pid = parts
-            pid = pid.strip()
-            cmd = cmd.strip()
-            if any(keyword.lower() in cmd.lower() for keyword in PROJECT_KEYWORDS):
-                processes.append((int(pid), cmd))
-
-    return processes
-
-
-def kill_process(pid):
+for proc in psutil.process_iter(['pid', 'cmdline', 'name']):
     try:
-        os.kill(pid, signal.SIGTERM)
-        print(f"✅ Killed PID {pid}")
-    except Exception as e:
-        print(f"❌ Failed to kill PID {pid}: {e}")
+        pid = proc.info['pid']
+        name = proc.info['name']
+        cmdline = " ".join(proc.info['cmdline']) if proc.info['cmdline'] else ""
 
+        # Skip self
+        if pid == current_pid:
+            continue
 
-def main():
-    procs = list_python_processes()
-    if not procs:
-        print("No matching FastAPI-related Python processes found.")
-        return
+        # Only target Python processes (strict filter)
+        if name and "python" in name.lower():
+            if any(keyword in cmdline for keyword in keywords):
+                print(f"Killing PID {pid}: {cmdline}")
+                proc.kill()
+                killed.append(pid)
 
-    for pid, cmd in procs:
-        print(f"\nFound: PID {pid}")
-        print(f"Cmd: {cmd}")
-        if CONFIRM_BEFORE_KILL:
-            confirm = input("Kill this process? (y/n): ").strip().lower()
-            if confirm != "y":
-                continue
-        kill_process(pid)
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+        continue
 
-
-if __name__ == "__main__":
-    main()
+if not killed:
+    print("No matching FastAPI-related processes found.")
+else:
+    print(f"Killed PIDs: {killed}")
