@@ -356,6 +356,8 @@ function LoadingFallback() {
 }
 
 export default function LoginPage() {
+  console.log('TURNSTILE:', process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
+  console.log('GOOGLE:', process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID);
   return (
     <Suspense fallback={<LoadingFallback />}>
       <LoginContent />
