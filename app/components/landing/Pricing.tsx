@@ -12,6 +12,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { toast } from 'sonner';
 
 const plans = [
     {
@@ -19,37 +20,36 @@ const plans = [
         label: 'Perfect for individual investors',
         monthlyPrice: 9,
         yearlyPrice: 64,
-        yearlyDiscount: 40,
+        yearlyDiscount: 44,
         features: [
             'Access to all public filings',
-            'Basic search functionality',
-            'Download tables as CSV',
-            'Simple filing viewer',
+            'Enhanced filing viewer',
             'Email support'
         ],
-        popular: false
+        popular: false,
+        priceId: 'price_basic'
     },
     {
         name: 'Intermediate',
         label: 'For serious investors',
-        monthlyPrice: 19,
-        yearlyPrice: 190,
-        yearlyDiscount: 40,
+        monthlyPrice: 18,
+        yearlyPrice: 129,
+        yearlyDiscount: 87,
         features: [
             'All Starter features',
-            'Take notes on filings',
-            'Download as epub',
             'Filing alerts',
-            'Customizable watchlists'
+            'Download tables as CSV',
+            'Download as epub'
         ],
-        popular: true
+        popular: true,
+        priceId: 'price_pro'
     },
     {
         name: 'Advanced',
         label: 'For professional investors',
-        monthlyPrice: 99.99,
-        yearlyPrice: 999,
-        yearlyDiscount: 200,
+        monthlyPrice: 27,
+        yearlyPrice: 194,
+        yearlyDiscount: 130,
         features: [
             'All Intermediate features',
             'AI-powered filing analysis',
@@ -65,8 +65,44 @@ const plans = [
 ];
 
 export function Pricing() {
-    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
     const [isFreeTrial, setIsFreeTrial] = useState(true);
+    const [loading, setLoading] = useState(false);
+
+    const handleSubscribe = async (plan: typeof plans[0]) => {
+        if (plan.disabled) return;
+
+        try {
+            setLoading(true);
+
+            // Create checkout session
+            const response = await fetch('/api/subscription/create-checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    priceId: plan.priceId,
+                    billingCycle,
+                    trialDays: isFreeTrial ? 7 : 0,
+                    successUrl: `${window.location.origin}/subscription/success`,
+                    cancelUrl: `${window.location.origin}/subscription/canceled`,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create checkout session');
+            }
+
+            const { url } = await response.json();
+            window.location.href = url;
+        } catch (error) {
+            console.error('Subscription error:', error);
+            toast.error('Failed to start subscription process. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div id="pricing" className="container mx-auto px-4 py-16">
@@ -92,7 +128,7 @@ export function Pricing() {
                     >
                         Yearly
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            20% OFF
+                            40% OFF
                         </span>
                     </button>
                 </div>
@@ -135,9 +171,11 @@ export function Pricing() {
                                     </CardTitle>
                                     <CardDescription>{plan.label}</CardDescription>
                                 </div>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                    20% OFF
-                                </span>
+                                {billingCycle === 'yearly' && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        40% OFF
+                                    </span>
+                                )}
                             </div>
                             <div className="mt-4">
                                 <div className="flex items-baseline">
@@ -145,13 +183,15 @@ export function Pricing() {
                                     <span className="text-5xl font-bold">{billingCycle === 'monthly' ? plan.monthlyPrice : (plan.yearlyPrice / 12).toFixed(2)}</span>
                                     <span className="text-muted-foreground">/month</span>
                                 </div>
-                                <div className="mt-1 text-sm text-muted-foreground">
-                                    Billed as ${billingCycle === 'monthly' ? (plan.monthlyPrice * 12).toFixed(2) : plan.yearlyPrice}/year
-                                </div>
                                 {billingCycle === 'yearly' && (
-                                    <div className="mt-1 text-sm text-green-600">
-                                        Save ${plan.yearlyDiscount} with yearly pricing (20% off)
-                                    </div>
+                                    <>
+                                        <div className="mt-1 text-sm text-muted-foreground">
+                                            Billed as ${plan.yearlyPrice}/year
+                                        </div>
+                                        <div className="mt-1 text-sm text-green-600">
+                                            Save ${plan.yearlyDiscount} with yearly pricing (40% off)
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </CardHeader>
@@ -172,13 +212,26 @@ export function Pricing() {
                             <Button
                                 className="w-full"
                                 variant={plan.popular ? 'default' : 'outline'}
-                                disabled={plan.disabled}
+                                disabled={plan.disabled || loading}
+                                onClick={() => handleSubscribe(plan)}
                             >
-                                {plan.disabled ? 'Coming Soon' : 'Start 7 day free trial →'}
+                                {plan.disabled 
+                                    ? 'Coming Soon' 
+                                    : loading 
+                                        ? 'Processing...' 
+                                        : isFreeTrial 
+                                            ? 'Start 7 day free trial →'
+                                            : 'Get started →'
+                                }
                             </Button>
                             <div className="text-sm text-muted-foreground text-center flex items-center justify-center gap-1.5">
                                 <Shield className="h-4 w-4" />
-                                {plan.disabled ? 'Register interest below' : '$0.00 due today, cancel anytime'}
+                                {plan.disabled 
+                                    ? 'Register interest below' 
+                                    : isFreeTrial 
+                                        ? '$0.00 due today, cancel anytime'
+                                        : '7 day money-back guarantee'
+                                }
                             </div>
                         </CardFooter>
                     </Card>

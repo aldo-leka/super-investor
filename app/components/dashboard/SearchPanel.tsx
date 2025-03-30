@@ -42,7 +42,7 @@ export default function SearchPanel({query, onQueryChange, results, onSelect, se
                             >
                                 <div className="flex items-center gap-2 w-full">
                                     <span className="font-mono whitespace-nowrap">{stock.symbol}</span>
-                                    <span className="text-muted-foreground truncate">{stock.companyName}</span>
+                                    <span className="text-muted-foreground truncate">{stock.name}</span>
                                 </div>
                             </Button>
                         ))}

@@ -1,33 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Stock, StockApi } from '@/types';
+import { Stock } from '@/types';
 
 export function useStockSearch(query: string) {
     const [results, setResults] = useState<Stock[]>([]);
 
     useEffect(() => {
         if (query.length < 1) {
+            console.log('setting results to empty');
             setResults([]);
             return;
         }
 
         const timeoutId = setTimeout(async () => {
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/tickers/search?q=${encodeURIComponent(query)}&limit=1000`);
-                const rawData: StockApi[] = await res.json();
-
-                const data: Stock[] = rawData.map(item => ({
-                    cik: item.cik,
-                    symbol: item.ticker,
-                    companyName: item.company_name
-                }));
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tickers/search?query=${encodeURIComponent(query)}&limit=500`);
+                const data: Stock[] = await res.json();
 
                 const input = query.toLowerCase();
 
                 const sorted = data.sort((a, b) => {
                     const aSymbol = (a.symbol ?? '').toLowerCase();
                     const bSymbol = (b.symbol ?? '').toLowerCase();
-                    const aName = a.companyName.toLowerCase();
-                    const bName = b.companyName.toLowerCase();
+                    const aName = a.name.toLowerCase();
+                    const bName = b.name.toLowerCase();
 
                     const aHas = !!a.symbol;
                     const bHas = !!b.symbol;

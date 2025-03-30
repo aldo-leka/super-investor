@@ -1,9 +1,8 @@
 export interface FilingApi {
     id: number;
-    form_type: string;
-    date_filed: string;
-    txt_filename: string;
-    quarter: string;
+    filing_type: string;
+    filing_date: string;
+    filing_url: string;
 }
 
 export interface Filing {
@@ -16,14 +15,8 @@ export interface Filing {
     category: string;
 }
 
-export interface StockApi {
-    cik: string;
-    ticker: string | null;
-    company_name: string;
-}
-
 export interface Stock {
     cik: string;
     symbol: string | null;
-    companyName: string;
+    name: string;
 }

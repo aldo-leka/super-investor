@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Stock, Filing } from '@/types';
 import { useStockSearch } from '@/lib/hooks/useStockSearch';
 import { fetchFilingsByStock } from '@/lib/hooks/useFilings';
 import SearchPanel from '@/components/dashboard/SearchPanel';
 import FilingListPanel from '@/components/dashboard/FilingListPanel';
 import FilingViewer from '@/components/dashboard/FilingViewer';
-import { Sparkles } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from "@/components/ui/button";
+import Header from '@/components/dashboard/Header';
 import { FILING_CATEGORIES } from "@/lib/filingUtils";
-import { Logo } from '@/components/Logo';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function DashboardPage() {
     const [searchQuery, setSearchQuery] = useState('');
@@ -33,7 +31,7 @@ export default function DashboardPage() {
     const handleFilingSelect = async (filing: Filing) => {
         setSelectedFiling(filing);
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/filings/${filing.fileName}`);
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/filing-content/${filing.fileName}`);
             const rawData = await res.json();
             setFilingContent(rawData);
         } catch (error) {
@@ -42,50 +40,40 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background">
-            <header className="border-b">
-                <div className="container mx-auto px-4 py-4">
-                    <div className="flex items-center justify-between">
-                        <Logo />
-                        <Link href="/pricing">
-                            <Button>
-                                <Sparkles className="mr-2 h-4 w-4" />
-                                Upgrade to Pro
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-            </header>
-            <main className="container mx-auto px-4 py-6">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    <div className="md:col-span-4 space-y-4">
-                        <SearchPanel
-                            query={searchQuery}
-                            onQueryChange={setSearchQuery}
-                            results={searchResults}
-                            onSelect={handleStockSelect}
-                            selectedStock={selectedStock}
-                        />
-                        {selectedStock && (
-                            <FilingListPanel
-                                filings={filings}
-                                selectedFiling={selectedFiling}
-                                onSelectFiling={handleFilingSelect}
-                                selectedCategory={selectedCategory}
-                                onCategoryChange={setSelectedCategory}
+        <ProtectedRoute>
+            <div className="min-h-screen bg-background">
+                <Header />
+                <main className="container mx-auto px-4 py-6">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                        <div className="md:col-span-4 space-y-4">
+                            <SearchPanel
+                                query={searchQuery}
+                                onQueryChange={setSearchQuery}
+                                results={searchResults}
+                                onSelect={handleStockSelect}
+                                selectedStock={selectedStock}
                             />
-                        )}
-                    </div>
+                            {selectedStock && (
+                                <FilingListPanel
+                                    filings={filings}
+                                    selectedFiling={selectedFiling}
+                                    onSelectFiling={handleFilingSelect}
+                                    selectedCategory={selectedCategory}
+                                    onCategoryChange={setSelectedCategory}
+                                />
+                            )}
+                        </div>
 
-                    <div className="md:col-span-8">
-                        <FilingViewer
-                            filing={selectedFiling}
-                            content={filingContent}
-                            category={selectedFiling?.category || ''}
-                        />
+                        <div className="md:col-span-8">
+                            <FilingViewer
+                                filing={selectedFiling}
+                                content={filingContent}
+                                category={selectedFiling?.category || ''}
+                            />
+                        </div>
                     </div>
-                </div>
-            </main>
-        </div>
+                </main>
+            </div>
+        </ProtectedRoute>
     );
 }

@@ -1,14 +1,27 @@
-from urllib.parse import urlparse
-import psycopg2
-from config import DATABASE_URL
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
 
 
-def get_db_connection():
-    parsed = urlparse(DATABASE_URL)
-    return psycopg2.connect(
-        dbname=parsed.path[1:],
-        user=parsed.username,
-        password=parsed.password,
-        host=parsed.hostname,
-        port=parsed.port
-    )
+def init_db():
+    """Create all tables in the database."""
+    Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

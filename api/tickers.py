@@ -1,32 +1,42 @@
-from fastapi import APIRouter, Request, HTTPException, Query
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import or_, desc, case
+from sqlalchemy.sql.expression import literal
 from typing import List
-from db import get_db_connection
-from deps import limiter
+from db import get_db
+from models import Ticker
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
-router = APIRouter()
+router = APIRouter(tags=["tickers"])
+limiter = Limiter(key_func=get_remote_address)
 
-
-@router.get("/tickers/search")
+@router.get("/search")
 @limiter.limit("300/minute")
-def search_tickers(
-        request: Request,
-        q: str = Query(..., min_length=1, max_length=100),
-        limit: int = Query(15, gt=0, le=1000)
-) -> List[dict]:
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT cik, company_name, ticker
-            FROM tickers
-            WHERE LOWER(company_name) LIKE LOWER(%s)
-               OR LOWER(ticker) LIKE LOWER(%s)
-            ORDER BY (ticker IS NULL), company_name
-            LIMIT %s;
-        """, (f"%{q}%", f"%{q}%", limit))
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        return [{"cik": r[0], "company_name": r[1], "ticker": r[2]} for r in rows]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def search_tickers(
+    request: Request,
+    query: str = Query(..., min_length=1, max_length=100),
+    limit: int = Query(15, gt=0, le=500),
+    db: Session = Depends(get_db)
+):
+    """Search tickers by name or symbol."""
+    if not query:
+        return []
+        
+    search_query = f"%{query}%"
+    
+    results = db.query(Ticker).filter(
+        or_(
+            Ticker.name.ilike(search_query),
+            Ticker.symbol.ilike(search_query)
+        )
+    ).order_by(
+        # Prioritize non-null symbols
+        case(
+            (Ticker.symbol.is_(None), literal(2)),  # Null symbols get lowest priority
+            else_=literal(1)                        # Non-null symbols get higher priority
+        ),
+        Ticker.name
+    ).limit(limit).all()
+    
+    return results

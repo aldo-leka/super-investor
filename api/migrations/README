@@ -1,0 +1,15 @@
+How to use Alembic:
+
+1. Create a migration
+```alembic revision -m "seed tickers"```
+
+1.2 Detect changes with db schema
+```alembic revision --autogenerate -m "add_super_user"```
+
+2. Edit the migration as necessary
+
+3. Apply the migration
+```alembic upgrade head```
+
+3.2 Apply a specific migration
+```alembic upgrade <revision_id>```

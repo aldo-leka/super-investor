@@ -1,6 +1,8 @@
-import type {Metadata} from "next";
-import {Merriweather} from "next/font/google";
+import { Merriweather } from "next/font/google";
 import "./globals.css";
+import { defaultMetadata } from "@/metadata";
+import Script from "next/script";
+import Providers from "@/components/Providers";
 
 const merriweather = Merriweather({
     variable: "--font-merriweather",
@@ -8,33 +10,7 @@ const merriweather = Merriweather({
     weight: ["400"]
 });
 
-export const metadata: Metadata = {
-    title: "Super Investor",
-    description: "Analyze SEC filings with ease",
-    openGraph: {
-        title: "Super Investor",
-        description: "Analyze SEC filings with ease",
-        url: "/",
-        siteName: "Super Investor",
-        images: [
-            {
-                url: "/og-image.png",
-                width: 1200,
-                height: 630,
-                alt: "Super Investor Preview",
-            },
-        ],
-        locale: "en_US",
-        type: "website",
-    },
-    twitter: {
-        card: "summary_large_image",
-        title: "Super Investor",
-        description: "Analyze SEC filings with ease",
-        images: ["/og-image.png"],
-        creator: "@aldo_valueguy",
-    },
-};
+export const metadata = defaultMetadata;
 
 export default function RootLayout(
     {
@@ -43,9 +19,15 @@ export default function RootLayout(
 ) {
     return (
         <html lang="en">
-        <body className={`${merriweather.className} antialiased`}>
-            {children}
-        </body>
+            <body className={`${merriweather.className} antialiased`}>
+                <Providers>
+                    {children}
+                </Providers>
+                <Script
+                    src="https://accounts.google.com/gsi/client"
+                    strategy="afterInteractive"
+                />
+            </body>
         </html>
     );
 }

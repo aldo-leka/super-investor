@@ -18,15 +18,15 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
-        pathname: '/**'
+        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'i.pravatar.cc',
         pathname: '/**',
-      }
-    ]
-  }
+      },
+    ],
+  },
 };
 
 export default nextConfig;

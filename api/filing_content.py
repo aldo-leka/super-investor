@@ -21,10 +21,10 @@ except ImportError:  # Python 3.5+
     class HTMLParseError(Exception):
         pass
 
-router = APIRouter()
+router = APIRouter(tags=["filing-content"])
 
 
-@router.get("/filings/{file_name:path}")
+@router.get("/filing-content/{file_name:path}")
 def get_filing(request: Request, file_name: str) -> Dict[str, Any] | None:
     html_index = f"https://www.sec.gov/Archives/{file_name.replace('.txt', '-index.html')}"
 

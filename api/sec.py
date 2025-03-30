@@ -4,17 +4,17 @@ import itertools
 import zipfile
 import requests
 from datetime import datetime
-from urllib.parse import urlparse
-import psycopg2
-from psycopg2.extras import execute_values
 from retry import requests_retry_session
-from config import USER_AGENT, DATABASE_URL
+from config import USER_AGENT
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
+from db import get_db
+from models import Ticker, Filing
 
 BASE_URL = "https://www.sec.gov/Archives/edgar/full-index"
 
 
-def update_tickers_data(testing: bool):
+def update_tickers_data(testing: bool, db: Session = next(get_db())):
     if testing:
         return {"status": "success", "message": "Test mode: ticker update skipped."}
 
@@ -29,55 +29,33 @@ def update_tickers_data(testing: bool):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fetch failed: {str(e)}")
 
-    sec_data = {
-        str(entry['cik_str']): {
-            "company_name": entry.get("title"),
-            "ticker": entry.get("ticker")
-        } for entry in data.values()
-    }
-
     try:
-        parsed = urlparse(DATABASE_URL)
-        conn = psycopg2.connect(
-            dbname=parsed.path[1:],
-            user=parsed.username,
-            password=parsed.password,
-            host=parsed.hostname,
-            port=parsed.port
-        )
-        cur = conn.cursor()
+        tickers_updated = 0
+        for entry in data.values():
+            ticker = db.query(Ticker).filter(Ticker.cik == str(entry['cik_str'])).first()
+            if ticker:
+                ticker.name = entry.get("title")
+                ticker.symbol = entry.get("ticker")
+            else:
+                new_ticker = Ticker(
+                    cik=str(entry['cik_str']),
+                    name=entry.get("title"),
+                    symbol=entry.get("ticker")
+                )
+                db.add(new_ticker)
+            tickers_updated += 1
 
-        for cik, info in sec_data.items():
-            cur.execute("""
-                INSERT INTO tickers (cik, company_name, ticker)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (cik) DO UPDATE
-                SET company_name = EXCLUDED.company_name,
-                    ticker = EXCLUDED.ticker;
-            """, (cik, info["company_name"], info["ticker"]))
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return {"status": "success", "tickers_updated": len(sec_data)}
+        db.commit()
+        return {"status": "success", "tickers_updated": tickers_updated}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-def update_edgar_filings_data(testing: bool):
+# TODO FIX THIS
+def update_filings_data(testing: bool, db: Session = next(get_db())):
     if testing:
         return {"status": "success", "message": "Test mode: filing update skipped."}
-
-    parsed = urlparse(DATABASE_URL)
-    conn = psycopg2.connect(
-        dbname=parsed.path[1:],
-        user=parsed.username,
-        password=parsed.password,
-        host=parsed.hostname,
-        port=parsed.port
-    )
-    cur = conn.cursor()
 
     now = datetime.utcnow()
     year = now.year
@@ -105,6 +83,7 @@ def update_edgar_filings_data(testing: bool):
             tmp.write(req.content)
             tmp.seek(0)
 
+            filings_processed = 0
             with zipfile.ZipFile(tmp).open("master.idx") as f:
                 lines = [
                     line.decode("latin-1")
@@ -112,31 +91,35 @@ def update_edgar_filings_data(testing: bool):
                 ]
                 entries = [line.strip().split("|") for line in lines if len(line.strip().split("|")) == 5]
 
-        data = [
-            (cik, company_name, form_type, date_filed, txt_filename, quarter_key)
-            for cik, company_name, form_type, date_filed, txt_filename in entries
-        ]
+            for entry in entries:
+                cik, company_name, form_type, date_filed, txt_filename = entry
+                
+                # Check if filing already exists
+                existing_filing = db.query(Filing).filter(
+                    Filing.filing_url == txt_filename
+                ).first()
+                
+                if not existing_filing:
+                    new_filing = Filing(
+                        cik=cik,
+                        company_name=company_name,
+                        form_type=form_type,
+                        date_filed=date_filed,
+                        filing_url=txt_filename,
+                        quarter=quarter_key
+                    )
+                    db.add(new_filing)
+                    filings_processed += 1
 
-        execute_values(
-            cur,
-            """
-            INSERT INTO edgar_filings (cik, company_name, form_type, date_filed, txt_filename, quarter)
-            VALUES %s
-            ON CONFLICT (txt_filename) DO NOTHING
-            """,
-            data
-        )
+            db.commit()
 
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return {
-            "status": "success",
-            "filings_processed": len(data),
-            "quarter": quarter_key,
-            "timestamp": now.isoformat()
-        }
+            return {
+                "status": "success",
+                "filings_processed": filings_processed,
+                "quarter": quarter_key,
+                "timestamp": now.isoformat()
+            }
 
     except Exception as e:
+        db.rollback()
         return {"status": "error", "message": f"Download or processing failed: {str(e)}"}
