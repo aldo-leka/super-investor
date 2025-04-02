@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
+// Constants
+const ACCESS_TOKEN_EXPIRE_MINUTES = 30; // Should match backend config
+
 interface User {
   email: string;
   username: string;
@@ -19,14 +22,48 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, turnstileToken: string) => Promise<void>;
   loginWithGoogle: (token: string) => Promise<void>;
-  logout: () => void;
-  register: (username: string, firstName: string, lastName: string, email: string, password: string, turnstileToken: string) => Promise<void>;
+  logout: () => Promise<void>;
+  register: (username: string, firstName: string, lastName: string, email: string, password: string, turnstileToken: string) => Promise<string>;
   requestMagicLink: (email: string, turnstileToken: string) => Promise<void>;
   updateProfile: (data: { first_name?: string; last_name?: string; username?: string }) => Promise<void>;
   setSession: (session: { accessToken: string; user: User }) => void;
+  refreshAccessToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Store access token in memory
+let memoryAccessToken: string | null = null;
+
+export async function fetchWithAuth(
+  url: string,
+  options: RequestInit = {},
+  refreshAccessToken: () => Promise<boolean>
+): Promise<Response> {
+  // Add Authorization header if we have an access token
+  const headers = {
+    ...options.headers,
+    ...(memoryAccessToken ? { 'Authorization': `Bearer ${memoryAccessToken}` } : {})
+  };
+
+  // Make the initial request
+  let response = await fetch(url, { ...options, headers });
+
+  // If we get a 401 and have a refresh token, try to refresh
+  if (response.status === 401 && memoryAccessToken) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      // Retry the original request with the new access token
+      const newHeaders = {
+        ...options.headers,
+        'Authorization': `Bearer ${memoryAccessToken}`
+      };
+      response = await fetch(url, { ...options, headers: newHeaders });
+    }
+  }
+
+  return response;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -36,74 +73,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error: null,
   });
 
-  useEffect(() => {
-    // Check localStorage for existing token on mount
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      // Validate the token and get user session
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/session`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-        .then(async (res) => {
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({}));
-            console.error('Session validation failed:', {
-              status: res.status,
-              statusText: res.statusText,
-              error: errorData
-            });
-            throw new Error(`Session validation failed: ${res.status} ${res.statusText}`);
-          }
-          return res.json();
-        })
-        .then((data) => {
-          console.log('Session validation response:', data); // Debug log
-          
-          // Check if we have a valid user object
-          if (!data || typeof data !== 'object') {
-            console.error('Invalid session response format:', data);
-            throw new Error('Invalid session response format');
-          }
+  const refreshAccessToken = useCallback(async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include', // Important for sending cookies
+      });
 
-          // Ensure we have the minimum required user data
-          if (!data.user || !data.user.email || !data.user.username) {
-            console.error('Missing required user data:', data.user);
-            throw new Error('Missing required user data in session');
-          }
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
 
-          setState({
-            user: {
-              email: data.user.email,
-              username: data.user.username,
-              first_name: data.user.first_name,
-              last_name: data.user.last_name,
-              image: data.user.image || undefined,
-              subscription_tier: data.user.subscription_tier || 'free'
-            },
-            accessToken: token,
-            loading: false,
-            error: null,
-          });
-        })
-        .catch((error) => {
-          console.error('Session validation error:', error);
-          // Only remove the token if it's an authentication error
-          if (error.message.includes('401') || error.message.includes('403')) {
-            localStorage.removeItem('accessToken');
-          }
-          setState({ user: null, accessToken: null, loading: false, error: error.message });
-        });
-    } else {
-      setState((s) => ({ ...s, loading: false }));
+      const data = await response.json();
+      memoryAccessToken = data.access_token;
+      setState(prev => ({
+        ...prev,
+        accessToken: data.access_token,
+        user: data.user,
+        error: null,
+      }));
+      return true;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      setState(prev => ({
+        ...prev,
+        user: null,
+        accessToken: null,
+        error: 'Session expired. Please log in again.',
+      }));
+      return false;
     }
   }, []);
+
+  useEffect(() => {
+    // Check for existing session on mount
+    const checkSession = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/session`, {
+          credentials: 'include', // Important for sending cookies
+          headers: memoryAccessToken ? {
+            'Authorization': `Bearer ${memoryAccessToken}`
+          } : {}
+        });
+
+        if (!response.ok) {
+          // Try to refresh the token if session check fails
+          const refreshed = await refreshAccessToken();
+          if (!refreshed) {
+            setState(prev => ({ ...prev, loading: false }));
+            return;
+          }
+          // If refresh succeeded, we don't need to do anything else
+          // because refreshAccessToken already updated the state
+          setState(prev => ({ ...prev, loading: false }));
+          return;
+        }
+
+        const data = await response.json();
+        memoryAccessToken = data.access_token;
+        setState({
+          user: data.user,
+          accessToken: data.access_token,
+          loading: false,
+          error: null,
+        });
+      } catch (error) {
+        console.error('Session check failed:', error);
+        // Try to refresh the token if session check fails with an error
+        const refreshed = await refreshAccessToken();
+        if (!refreshed) {
+          setState(prev => ({ ...prev, loading: false }));
+          return;
+        }
+        // If refresh succeeded, we don't need to do anything else
+        // because refreshAccessToken already updated the state
+        setState(prev => ({ ...prev, loading: false }));
+      }
+    };
+
+    checkSession();
+  }, [refreshAccessToken]);
+
+  const refreshInterval = Math.max((ACCESS_TOKEN_EXPIRE_MINUTES - 5) * 60 * 1000, 30_000); // min 30s
+
+  // Add token refresh interval
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (state.accessToken) {
+        await refreshAccessToken();
+      }
+    }, refreshInterval);
+
+    return () => clearInterval(interval);
+  }, [state.accessToken, refreshAccessToken]);
 
   const login = async (email: string, password: string, turnstileToken: string) => {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // Important for sending cookies
       body: JSON.stringify({ email, password, turnstile_token: turnstileToken }),
     });
 
@@ -114,34 +182,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const data = await res.json();
-    console.log('Login response:', data);  // Debug log
-
-    if (!data.access_token) {
-      console.error('No access token in response:', data);
-      throw new Error('Invalid response format: missing access token');
-    }
-
-    if (!data.user) {
-      console.error('No user data in response:', data);
-      throw new Error('Invalid response format: missing user data');
-    }
-
-    const { email: userEmail, username, first_name, last_name, image: userImage, subscription_tier: userTier } = data.user;
-    if (!userEmail || !username) {
-      console.error('Missing required user fields:', data.user);
-      throw new Error('Invalid user data format');
-    }
-
-    localStorage.setItem('accessToken', data.access_token);
+    memoryAccessToken = data.access_token;
     setState({
-      user: {
-        email: userEmail,
-        username,
-        first_name,
-        last_name,
-        image: userImage || undefined,
-        subscription_tier: userTier || 'free'
-      },
+      user: data.user,
       accessToken: data.access_token,
       loading: false,
       error: null,
@@ -152,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', // Important for sending cookies
       body: JSON.stringify({ token }),
     });
 
@@ -162,53 +206,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const data = await res.json();
-    console.log('Google login response:', data);  // Debug log
-
-    if (!data.access_token) {
-      console.error('No access token in response:', data);
-      throw new Error('Invalid response format: missing access token');
-    }
-
-    if (!data.user) {
-      console.error('No user data in response:', data);
-      throw new Error('Invalid response format: missing user data');
-    }
-
-    localStorage.setItem('accessToken', data.access_token);
-
+    memoryAccessToken = data.access_token;
     setState({
-      user: {
-        email: data.user.email,
-        username: data.user.username,
-        first_name: data.user.first_name,
-        last_name: data.user.last_name,
-        image: data.user.image || undefined,
-        subscription_tier: data.user.subscription_tier || 'free'
-      },
+      user: data.user,
       accessToken: data.access_token,
       loading: false,
       error: null,
     });
   };
 
-  const logout = () => {
-    localStorage.removeItem('accessToken');
-    setState({ user: null, accessToken: null, loading: false, error: null });
+  const logout = async () => {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include', // Important for sending cookies
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      memoryAccessToken = null;
+      setState({ user: null, accessToken: null, loading: false, error: null });
+    }
   };
 
   const register = async (username: string, firstName: string, lastName: string, email: string, password: string, turnstileToken: string) => {
     try {
+      const requestBody: any = {
+        email,
+        password,
+        turnstile_token: turnstileToken
+      };
+
+      // Only include optional fields if they have values
+      if (username?.trim()) requestBody.username = username;
+      if (firstName?.trim()) requestBody.first_name = firstName;
+      if (lastName?.trim()) requestBody.last_name = lastName;
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          first_name: firstName,
-          last_name: lastName,
-          email,
-          password,
-          turnstile_token: turnstileToken
-        }),
+        credentials: 'include', // Important for sending cookies
+        body: JSON.stringify(requestBody),
       });
 
       const data = await res.json();
@@ -220,20 +258,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Registration failed');
       }
 
-      localStorage.setItem('accessToken', data.access_token);
+      // Since registration no longer logs the user in automatically,
+      // we'll just clear any existing state
+      memoryAccessToken = null;
       setState({
-        user: {
-          email: data.email,
-          username,
-          first_name: data.first_name,
-          last_name: data.last_name,
-          image: data.profile_picture_url,
-          subscription_tier: data.subscription_tier || 'free'
-        },
-        accessToken: data.access_token,
+        user: null,
+        accessToken: null,
         loading: false,
         error: null,
       });
+
+      // Return the success message from the backend
+      return data.message;
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -244,7 +280,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/magic-link`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      credentials: 'include', // Important for sending cookies
+      body: JSON.stringify({
         email,
         turnstile_token: turnstileToken
       }),
@@ -267,6 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${state.accessToken}`,
       },
+      credentials: 'include', // Important for sending cookies
       body: JSON.stringify(data),
     });
 
@@ -286,6 +324,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const setSession = useCallback((session: { accessToken: string; user: User }) => {
+    memoryAccessToken = session.accessToken;
+    console.log('Setting session:', session);
     setState(prev => ({
       ...prev,
       user: session.user,
@@ -293,7 +333,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading: false,
       error: null,
     }));
-    localStorage.setItem('accessToken', session.accessToken);
   }, []);
 
   const value = {
@@ -305,6 +344,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     requestMagicLink,
     updateProfile,
+    refreshAccessToken,
   };
 
   return (

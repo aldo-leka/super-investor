@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional, Union
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status, Body, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, Body, UploadFile, File, Response, Cookie
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -19,6 +19,11 @@ from config import (
     SECRET_KEY,
     ALGORITHM,
     ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    REFRESH_TOKEN_COOKIE_NAME,
+    REFRESH_TOKEN_COOKIE_SECURE,
+    REFRESH_TOKEN_COOKIE_HTTPONLY,
+    REFRESH_TOKEN_COOKIE_SAMESITE,
     TURNSTILE_SECRET_KEY,
     GOOGLE_CLIENT_ID
 )
@@ -127,45 +132,51 @@ async def get_current_active_user(
     return current_user
 
 
-def generate_unique_username(db: Session, first_name: str, last_name: str) -> str:
-    """Generate a unique username based on first and last name."""
-    # Clean and format the name parts
-    first = re.sub(r'[^a-zA-Z0-9]', '', first_name.lower())
-    last = re.sub(r'[^a-zA-Z0-9]', '', last_name.lower())
-    
-    # Ensure we have at least 3 characters
-    if len(first) < 2:
-        first = first + 'user'
-    if len(last) < 2:
-        last = last + 'user'
-    
-    # Create base username (first-last)
-    base = f"{first}-{last}"
+def generate_unique_username(db: Session, first_name: Optional[str] = None, last_name: Optional[str] = None) -> str:
+    """Generate a unique username based on first and last name, with fallbacks for missing values."""
+    # Handle cases where both names are missing or empty
+    if not first_name and not last_name:
+        base = "user"
+    else:
+        # Clean and format the name parts, using empty string if None
+        first = re.sub(r'[^a-zA-Z0-9]', '', (first_name or '').lower())
+        last = re.sub(r'[^a-zA-Z0-9]', '', (last_name or '').lower())
+        
+        # If either part is empty after cleaning, use "user"
+        if not first:
+            first = "user"
+        if not last:
+            last = "user"
+        
+        # Create base username (first-last)
+        base = f"{first}-{last}"
     
     # Ensure it's not too long
     if len(base) > 30:
         base = base[:30]
     
     # Ensure it doesn't start with _ or -
-    if base.startswith('_') or base.startswith('-'):
-        base = 'user' + base
+    while base.startswith(('_', '-')):
+        base = base[1:]
+    if not base:  # If nothing left after removing leading _ and -
+        base = "user"
     
     username = base
     counter = 1
     
+    # Keep trying until we find a unique username
     while db.query(User).filter(User.username == username).first():
-        # Add counter while keeping under 30 chars
         suffix = str(counter)
-        if len(username) + len(suffix) > 30:
-            username = username[:30 - len(suffix)] + suffix
-        else:
-            username = f"{base}{suffix}"
+        # Make sure we have room for the counter
+        if len(base) + len(suffix) > 30:
+            base = base[:30 - len(suffix)]
+        username = f"{base}{suffix}"
         counter += 1
     
     return username
 
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     # Check if user already exists by email
     db_user = get_user(db, user_data.email)
@@ -175,7 +186,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    # Check if username is already taken (for email registration)
+    # Check if username is already taken (if provided)
     if user_data.username:
         existing_username = db.query(User).filter(User.username == user_data.username).first()
         if existing_username:
@@ -191,41 +202,60 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Invalid CAPTCHA"
         )
     
+    # Generate username if not provided
+    if not user_data.username:
+        username = generate_unique_username(db, user_data.first_name, user_data.last_name)
+    else:
+        username = user_data.username
+    
     # Create new user
     hashed_password = get_password_hash(user_data.password)
+    verification_token = create_verification_token(user_data.email)
     db_user = User(
         email=user_data.email,
-        username=user_data.username,
+        username=username,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         hashed_password=hashed_password,
         auth_provider=AuthProvider.EMAIL,
         is_verified=False,
-        verification_token=create_verification_token(user_data.email)
+        verification_token=verification_token
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
-    # Send verification email
-    await EmailService.send_verification_email(user_data.email, db_user.verification_token)
-    await EmailService.send_welcome_email(user_data.email, user_data.username)
-
-    # Create and return token for immediate login
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": db_user.email},
-        expires_delta=access_token_expires
-    )
+    # Send verification and welcome emails
+    await EmailService.send_verification_email(user_data.email, verification_token)
+    await EmailService.send_welcome_email(user_data.email, username)
+    
     return {
-        **db_user.dict(),
-        "access_token": access_token,
-        "token_type": "bearer"
+        "message": "Registration successful. Please check your email to verify your account."
     }
 
 
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def set_refresh_token_cookie(response: Response, token: str):
+    response.set_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        value=token,
+        httponly=REFRESH_TOKEN_COOKIE_HTTPONLY,
+        secure=REFRESH_TOKEN_COOKIE_SECURE,
+        samesite=REFRESH_TOKEN_COOKIE_SAMESITE,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # Convert days to seconds
+        path="/"
+    )
+
+
 @router.post("/token", response_model=TokenResponse)
-async def login(user_data: UserLogin, db: Session = Depends(get_db)):
+async def login(user_data: UserLogin, response: Response, db: Session = Depends(get_db)):
     print("Got turnstile token", user_data.turnstile_token)
     # Verify Turnstile token
     if not await verify_turnstile(user_data.turnstile_token):
@@ -281,6 +311,10 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):
         data={"sub": user.email}, expires_delta=access_token_expires
     )
 
+    # Create refresh token
+    refresh_token = create_refresh_token({"sub": user.email})
+    set_refresh_token_cookie(response, refresh_token)
+
     print("User data before response:", {  # Debug log
         "email": user.email,
         "username": user.username,
@@ -307,18 +341,18 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):
 
 
 @router.post("/google", response_model=TokenResponse)
-async def google_auth(google_data: GoogleAuth, db: Session = Depends(get_db)):
+async def google_auth(google_data: GoogleAuth, response: Response, db: Session = Depends(get_db)):
     try:
         # Use the access token to get user info from Google
         async with httpx.AsyncClient() as client:
-            response = await client.get(
+            google_response = await client.get(
                 'https://www.googleapis.com/oauth2/v3/userinfo',
                 headers={'Authorization': f'Bearer {google_data.token}'}
             )
-            if response.status_code != 200:
+            if google_response.status_code != 200:
                 raise ValueError('Failed to get user info from Google')
             
-            userinfo = response.json()
+            userinfo = google_response.json()
             email = userinfo.get('email')
             if not email:
                 raise ValueError('Email not found in token')
@@ -333,7 +367,7 @@ async def google_auth(google_data: GoogleAuth, db: Session = Depends(get_db)):
             
             if not user:
                 # Generate unique username for new Google users
-                username = generate_unique_username(db, first_name or 'user', last_name or 'google')
+                username = generate_unique_username(db, first_name, last_name)
                 
                 # Create new user
                 user = User(
@@ -360,19 +394,23 @@ async def google_auth(google_data: GoogleAuth, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(user)
             
-            # Create JWT token
+            # Create access token
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
                 data={"sub": user.email}, 
                 expires_delta=access_token_expires
             )
 
+            # Create refresh token
+            refresh_token = create_refresh_token({"sub": user.email})
+            set_refresh_token_cookie(response, refresh_token)
+
             return {
                 "access_token": access_token,
                 "token_type": "bearer",
                 "user": {
                     "email": user.email,
-                    "name": user.username,
+                    "username": user.username,
                     "first_name": user.first_name,
                     "last_name": user.last_name,
                     "image": user.profile_picture_url,
@@ -595,7 +633,7 @@ async def create_magic_link(
 
 
 @router.get("/verify-magic-link/{token}")
-async def verify_magic_link(token: str, db: Session = Depends(get_db)):
+async def verify_magic_link(token: str, response: Response, db: Session = Depends(get_db)):
     """Verify magic link and create/login user."""
     magic_link = db.query(MagicLink).filter(
         MagicLink.token == token,
@@ -611,8 +649,7 @@ async def verify_magic_link(token: str, db: Session = Depends(get_db)):
     user = get_user(db, magic_link.email)
     if not user:
         # Generate a unique username from the email
-        email_parts = magic_link.email.split('@')
-        username = generate_unique_username(db, email_parts[0], 'user')
+        username = generate_unique_username(db)
         
         # Create new user
         user = User(
@@ -637,6 +674,10 @@ async def verify_magic_link(token: str, db: Session = Depends(get_db)):
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
+
+    # Create refresh token
+    refresh_token = create_refresh_token({"sub": user.email})
+    set_refresh_token_cookie(response, refresh_token)
     
     return {
         "access_token": access_token,
@@ -659,6 +700,9 @@ async def update_profile(
     db: Session = Depends(get_db)
 ):
     """Update user profile information."""
+
+    print("Updating profile for user:", current_user.email, " with data:", profile_data)
+
     # Check if username is already taken by another user
     if profile_data.username and profile_data.username != current_user.username:
         existing_user = db.query(User).filter(
@@ -690,12 +734,13 @@ async def update_profile(
         current_user.first_name = profile_data.first_name
     if profile_data.last_name:
         current_user.last_name = profile_data.last_name
-    if profile_data.email:
-        current_user.email = profile_data.email
-        # If email is changed, mark as unverified and send verification email
-        current_user.is_verified = False
-        current_user.verification_token = create_verification_token(profile_data.email)
-        await EmailService.send_verification_email(profile_data.email, current_user.verification_token)
+    # if profile_data.email and profile_data.email != current_user.email:
+        # Only trigger email verification if the email has actually changed
+        # Currently disabled.
+        # current_user.email = profile_data.email
+        # current_user.is_verified = False
+        # current_user.verification_token = create_verification_token(profile_data.email)
+        # await EmailService.send_verification_email(profile_data.email, current_user.verification_token)
 
     db.commit()
     db.refresh(current_user)
@@ -770,3 +815,76 @@ async def get_profile(current_user: User = Depends(get_current_active_user)):
         "subscription_tier": current_user.subscription_tier,
         "has_password": current_user.hashed_password is not None
     }
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(response: Response, refresh_token: str = Cookie(None), db: Session = Depends(get_db)):
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token is missing"
+        )
+
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+        
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+        
+        user = get_user(db, email=email)
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+
+        # Create new access token
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+
+        # Create new refresh token
+        new_refresh_token = create_refresh_token({"sub": user.email})
+        set_refresh_token_cookie(response, new_refresh_token)
+
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "email": user.email,
+                "username": user.username,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "image": user.profile_picture_url,
+                "subscription_tier": user.subscription_tier
+            }
+        }
+
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    # Clear the refresh token cookie
+    response.delete_cookie(
+        key=REFRESH_TOKEN_COOKIE_NAME,
+        path="/",
+        secure=REFRESH_TOKEN_COOKIE_SECURE,
+        httponly=REFRESH_TOKEN_COOKIE_HTTPONLY,
+        samesite=REFRESH_TOKEN_COOKIE_SAMESITE
+    )
+    return {"message": "Successfully logged out"}

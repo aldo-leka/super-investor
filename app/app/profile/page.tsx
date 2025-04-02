@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/lib/auth';
+import { fetchWithAuth } from '@/lib/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
@@ -26,7 +27,7 @@ const profileSchema = z.object({
 });
 
 export default function ProfilePage() {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, refreshAccessToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -45,11 +46,11 @@ export default function ProfilePage() {
       if (!accessToken) return;
       
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        });
+        const response = await fetchWithAuth(
+          `${process.env.NEXT_PUBLIC_API_URL}/auth/profile`,
+          {},
+          refreshAccessToken
+        );
         if (response.ok) {
           const data = await response.json();
           setUsername(data.username || '');
@@ -64,7 +65,7 @@ export default function ProfilePage() {
     };
 
     loadProfileData();
-  }, [accessToken]);
+  }, [accessToken, refreshAccessToken]);
 
   // Update form fields when user data changes
   useEffect(() => {
@@ -108,19 +109,19 @@ export default function ProfilePage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+      const response = await fetchWithAuth(
+        `${process.env.NEXT_PUBLIC_API_URL}/auth/profile`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username,
+            first_name: firstName,
+            last_name: lastName,
+          }),
         },
-        body: JSON.stringify({
-          username,
-          first_name: firstName,
-          last_name: lastName,
-          email,
-        }),
-      });
+        refreshAccessToken
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -133,7 +134,6 @@ export default function ProfilePage() {
       setUsername(data.username);
       setFirstName(data.first_name || '');
       setLastName(data.last_name || '');
-      setEmail(data.email);
 
       toast.success('Profile updated successfully');
     } catch (error) {
@@ -152,23 +152,24 @@ export default function ProfilePage() {
 
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/password`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+      const response = await fetchWithAuth(
+        `${process.env.NEXT_PUBLIC_API_URL}/auth/password`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            hasPassword
+              ? {
+                  current_password: currentPassword,
+                  new_password: newPassword,
+                }
+              : {
+                  new_password: newPassword,
+                }
+          ),
         },
-        body: JSON.stringify(
-          hasPassword
-            ? {
-                current_password: currentPassword,
-                new_password: newPassword,
-              }
-            : {
-                new_password: newPassword,
-              }
-        ),
-      });
+        refreshAccessToken
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -225,7 +226,11 @@ export default function ProfilePage() {
                       <Avatar className="h-20 w-20">
                         <AvatarImage src={user?.image} alt={user?.username || ''} />
                         <AvatarFallback>
-                          {user?.username?.slice(0, 2).toUpperCase() || user?.email?.slice(0, 2).toUpperCase()}
+                          {user?.first_name && user?.last_name
+                            ? `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
+                            : user?.username
+                              ? user.username.slice(0, 2).toUpperCase()
+                              : user?.email?.slice(0, 2).toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
                     </div>
@@ -272,11 +277,12 @@ export default function ProfilePage() {
                         id="email"
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        disabled
+                        className="bg-muted"
                       />
-                      {validationErrors.email && (
-                        <p className="text-sm text-red-500">{validationErrors.email}</p>
-                      )}
+                      <p className="text-sm text-muted-foreground">
+                        Email cannot be changed
+                      </p>
                     </div>
 
                     <Button type="submit" disabled={loading}>

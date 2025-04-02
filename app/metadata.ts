@@ -3,10 +3,10 @@ import { Metadata } from 'next';
 export const siteConfig = {
   name: 'Super Investor',
   description: 'Advanced SEC filing analysis and insights for investors',
-  url: 'https://superinvestor.com',
-  ogImage: 'https://superinvestor.com/og.jpg',
+  url: 'https://superinvestor.pro',
+  ogImage: 'https://superinvestor.pro/og.jpg',
   links: {
-    twitter: 'https://twitter.com/superinvestor',
+    twitter: 'https://twitter.com/Super__Investor',
     github: 'https://github.com/superinvestor',
   },
 };
@@ -52,12 +52,12 @@ export const defaultMetadata: Metadata = {
     title: siteConfig.name,
     description: siteConfig.description,
     images: [siteConfig.ogImage],
-    creator: '@superinvestor',
+    creator: '@aldoleka',
   },
   icons: {
     icon: '/favicon.svg',
     // shortcut: '/favicon-16x16.png',
-    // apple: '/apple-touch-icon.png',
+    apple: '/apple-touch-icon.png',
   },
   manifest: '/site.webmanifest',
 };

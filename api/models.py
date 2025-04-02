@@ -104,27 +104,19 @@ class Filing(Base):
 # Pydantic Models for API
 class UserBase(BaseModel):
     email: EmailStr
-    username: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
 
-    @validator('username')
-    def validate_username(cls, v):
+    @validator('email')
+    def validate_email(cls, v):
         if not v:
-            raise ValueError('Username is required')
-        if len(v) < 3:
-            raise ValueError('Username must be at least 3 characters')
-        if len(v) > 30:
-            raise ValueError('Username must be at most 30 characters')
-        if not re.match(r'^[a-zA-Z0-9_-]+$', v):
-            raise ValueError('Username can only contain letters, numbers, underscores, and hyphens')
-        if v.startswith('_') or v.startswith('-'):
-            raise ValueError('Username cannot start with _ or -')
+            raise ValueError('Email is required')
         return v
 
 class UserCreate(UserBase):
     password: str = Field(..., min_length=8)
     turnstile_token: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    username: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr

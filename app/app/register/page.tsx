@@ -16,9 +16,10 @@ const registerSchema = z.object({
     .min(3, 'Username must be at least 3 characters')
     .max(30, 'Username must be at most 30 characters')
     .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
-    .refine(val => !val.startsWith('_') && !val.startsWith('-'), 'Username cannot start with _ or -'),
-  firstName: z.string().min(2, 'First name must be at least 2 characters'),
-  lastName: z.string().min(2, 'Last name must be at least 2 characters'),
+    .refine(val => !val.startsWith('_') && !val.startsWith('-'), 'Username cannot start with _ or -')
+    .optional(),
+  firstName: z.string().min(2, 'First name must be at least 2 characters').optional(),
+  lastName: z.string().min(2, 'Last name must be at least 2 characters').optional(),
   email: z.string().email('Invalid email address'),
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
@@ -52,13 +53,17 @@ function RegisterContent() {
 
   const validateForm = () => {
     try {
-      registerSchema.parse({
-        username,
-        firstName,
-        lastName,
+      const formData: any = {
         email,
         password,
-      });
+      };
+
+      // Only include optional fields if they have values
+      if (username?.trim()) formData.username = username;
+      if (firstName?.trim()) formData.firstName = firstName;
+      if (lastName?.trim()) formData.lastName = lastName;
+
+      registerSchema.parse(formData);
       setValidationErrors({});
       return true;
     } catch (error) {
@@ -250,11 +255,10 @@ function RegisterContent() {
                   <Input
                     id="firstName"
                     type="text"
-                    placeholder="First Name"
+                    placeholder="First Name (optional)"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     className="w-full bg-muted/50 border-0 focus-visible:ring-1"
-                    required
                   />
                   {validationErrors.firstName && (
                     <p className="text-sm text-red-500 mt-1">{validationErrors.firstName}</p>
@@ -265,11 +269,10 @@ function RegisterContent() {
                   <Input
                     id="lastName"
                     type="text"
-                    placeholder="Last Name"
+                    placeholder="Last Name (optional)"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     className="w-full bg-muted/50 border-0 focus-visible:ring-1"
-                    required
                   />
                   {validationErrors.lastName && (
                     <p className="text-sm text-red-500 mt-1">{validationErrors.lastName}</p>
@@ -280,11 +283,10 @@ function RegisterContent() {
                   <Input
                     id="username"
                     type="text"
-                    placeholder="Username"
+                    placeholder="Username (optional)"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     className="w-full bg-muted/50 border-0 focus-visible:ring-1"
-                    required
                   />
                   {validationErrors.username && (
                     <p className="text-sm text-red-500 mt-1">{validationErrors.username}</p>
@@ -295,7 +297,7 @@ function RegisterContent() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="name@example.com"
+                    placeholder="wb@berkshirehathaway.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-muted/50 border-0 focus-visible:ring-1"
