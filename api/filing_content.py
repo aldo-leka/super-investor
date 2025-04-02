@@ -17,11 +17,131 @@ from requests.exceptions import (
 try:
     from html.parser.HTMLParser import HTMLParseError
 except ImportError:  # Python 3.5+
-
     class HTMLParseError(Exception):
         pass
 
 router = APIRouter(tags=["filing-content"])
+
+
+@router.get("/filing-content/raw/{file_name:path}")
+def get_raw_filing(request: Request, file_name: str) -> Dict[str, Any] | None:
+    html_index = f"https://www.sec.gov/Archives/{file_name.replace('.txt', '-index.html')}"
+
+    print(f"Processing html_index: {html_index}")
+
+    try:
+        retries_exceeded = True
+        for _ in range(5):
+            session = requests.Session()
+            req = requests_retry_session(
+                retries=5, backoff_factor=0.2, session=session
+            ).get(url=html_index, headers={"User-agent": USER_AGENT})
+
+            if "will be managed until action is taken to declare your traffic." not in req.text:
+                retries_exceeded = False
+                break
+
+        if retries_exceeded:
+            print("Retries exceeded")
+            return None
+
+    except (RequestException, HTTPError, ConnectionError, Timeout, RetryError) as err:
+        print(
+            f"Request for {html_index} failed due to network-related error: {err}"
+        )
+        print("Request for {html_index} failed due to network-related error: {err}")
+        return None
+
+    print("downloaded html index")
+
+    soup = BeautifulSoup(req.content, "lxml")
+
+    try:
+        filing_type_text = soup.find("div", id="formName").find("strong").get_text(strip=True)
+        filing_type = re.search(r"Form\s+(.+)", filing_type_text).group(1)
+    except (HTMLParseError, Exception):
+        print("No filing type found")
+        return None
+
+    filing_date = None
+    for group in soup.find_all("div", class_="formGrouping"):
+        labels = group.find_all("div", class_="infoHead")
+        values = group.find_all("div", class_="info")
+        for label, value in zip(labels, values):
+            if label.get_text(strip=True) == "Filing Date":
+                filing_date = value.get_text(strip=True)
+                break
+        if filing_date:
+            break
+
+    if filing_date is None:
+        return None
+
+    all_tables = soup.find_all("table")
+    # filing_types = ["10-K", "10-Q", "8-K"]
+
+    print("Searching for document format files")
+
+    for table in all_tables:
+        if table.attrs.get("summary") == "Document Format Files":
+            htm_file_link, complete_text_file_link, link_to_download = None, None, None
+
+            for tr in table.find_all("tr")[1:]:
+                # if tr.contents[7].text in filing_types:
+                    # if tr.contents[5].contents[0].attrs["href"].split(".")[-1] in ["htm", "html"]:
+                        htm_file_link = "https://www.sec.gov" + tr.contents[5].contents[0].attrs["href"]
+                        break
+                # elif tr.contents[3].text == "Complete submission text file":
+                #     complete_text_file_link = "https://www.sec.gov" + tr.contents[5].contents[0].attrs["href"]
+                #     break
+
+            if htm_file_link:
+                link_to_download = htm_file_link.replace("ix?doc=/",
+                                                         "") if "ix?doc=/" in htm_file_link else htm_file_link
+            elif complete_text_file_link:
+                link_to_download = complete_text_file_link
+
+            print(link_to_download)
+
+            if link_to_download:
+                try:
+                    retries_exceeded = True
+                    for _ in range(5):
+                        session = requests.Session()
+                        req = requests_retry_session(
+                            retries=5, backoff_factor=0.2, session=session
+                        ).get(url=link_to_download, headers={"User-agent": USER_AGENT})
+
+                        if "will be managed until action is taken to declare your traffic." not in req.text:
+                            retries_exceeded = False
+                            break
+
+                    if retries_exceeded:
+                        print(f'Retries exceeded, could not download "{link_to_download}')
+                        return None
+                    
+                    print(f"req.text length: {len(req.text)}")
+
+                    # Process the HTML to fix image sources
+                    content_soup = BeautifulSoup(req.text, "lxml")
+                    for img in content_soup.find_all("img"):
+                        if img.get("src") and not img["src"].startswith(("http://", "https://")):
+                            img["src"] = "https://www.sec.gov" + img["src"]
+
+                    return {
+                        "Type": filing_type,
+                        "Date": filing_date,
+                        "filename": link_to_download,
+                        "raw_content": str(content_soup)
+                    }
+
+                except (RequestException, HTTPError, ConnectionError, Timeout, RetryError) as err:
+                    print(f"Request for {link_to_download} failed due to network-related error: {err}")
+                    return None
+            print("No link to download found")
+            return None
+    print("No link to download found")
+    return None
 
 
 @router.get("/filing-content/{file_name:path}")

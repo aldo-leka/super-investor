@@ -16,8 +16,7 @@ export default function DashboardPage() {
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
     const [filings, setFilings] = useState<Filing[]>([]);
     const [selectedFiling, setSelectedFiling] = useState<Filing | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState<string>(FILING_CATEGORIES[0]); // 'all'
-    const [filingContent, setFilingContent] = useState<Record<string, string>>({});
+    const [selectedCategory, setSelectedCategory] = useState<string>(FILING_CATEGORIES[0]);
 
     const searchResults = useStockSearch(searchQuery);
 
@@ -28,15 +27,8 @@ export default function DashboardPage() {
         setFilings(data);
     };
 
-    const handleFilingSelect = async (filing: Filing) => {
+    const handleFilingSelect = (filing: Filing) => {
         setSelectedFiling(filing);
-        try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/filing-content/${filing.fileName}`);
-            const rawData = await res.json();
-            setFilingContent(rawData);
-        } catch (error) {
-            console.error('Error fetching filings:', error);
-        }
     };
 
     return (
@@ -67,7 +59,6 @@ export default function DashboardPage() {
                         <div className="md:col-span-8">
                             <FilingViewer
                                 filing={selectedFiling}
-                                content={filingContent}
                                 category={selectedFiling?.category || ''}
                             />
                         </div>

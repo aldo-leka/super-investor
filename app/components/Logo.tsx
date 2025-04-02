@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { TrendingUp } from 'lucide-react';
+import Image from 'next/image';
 
 export function Logo() {
     return (
         <Link href="/" className="text-2xl font-bold flex items-center gap-2 hover:opacity-90 transition-opacity">
-            <TrendingUp className="h-6 w-6 text-green-600" />
+            <Image src="/favicon.svg" alt="Super Investor Logo" width={48} height={48} className="h-12 w-12" />
             Super Investor
         </Link>
     );
