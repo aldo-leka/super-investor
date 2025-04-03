@@ -5,20 +5,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
-function isProbablyInAppWebView(): boolean {
+const isGmailInAppBrowser = () => {
     const ua = navigator.userAgent || '';
-    const standalone = (navigator as any).standalone;
 
     const isIOS = /iPhone|iPad|iPod/.test(ua);
-    const isSafari = /Safari/.test(ua) && !/CriOS/.test(ua);
-    const isAndroid = /Android/.test(ua);
-    const isGmail = /Gmail/.test(ua) || /com.google.android.gm/.test(ua);
+    const isMobile = /Mobile/.test(ua);
+    const isCriOS = /CriOS/.test(ua); // Chrome iOS
+    const isVersionedSafari = /Version\/[\d.]+.*Safari/.test(ua); // In-app Safari often has this
 
-    return (
-        (isIOS && !isSafari && standalone === false) || // iOS in-app browser
-        (isAndroid && isGmail) // Android Gmail webview
-    );
-}
+    return isIOS && isMobile && !isCriOS && isVersionedSafari;
+};
 
 function VerifyMagicLinkContent() {
     const router = useRouter();
@@ -30,7 +26,7 @@ function VerifyMagicLinkContent() {
 
     useEffect(() => {
         // Check if user is using Gmail's in-app browser
-        if (isProbablyInAppWebView()) {
+        if (isGmailInAppBrowser()) {
             setIsGmailBrowser(true);
             return;
         }
@@ -47,25 +43,25 @@ function VerifyMagicLinkContent() {
             hasAttemptedVerification.current = true;
 
             try {
-                // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-magic-link/${token}`, {
-                //     method: 'GET',
-                //     credentials: 'include', // This is critical for setting the refresh_token cookie
-                // });
+                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-magic-link/${token}`, {
+                    method: 'GET',
+                    credentials: 'include', // This is critical for setting the refresh_token cookie
+                });
 
-                // const data = await response.json();
+                const data = await response.json();
 
-                // if (!response.ok) {
-                //     throw new Error(data.detail || 'Failed to verify magic link');
-                // }
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to verify magic link');
+                }
 
                 // Set the session with the returned data
-                // setSession({
-                //     accessToken: data.access_token,
-                //     user: data.user
-                // });
+                setSession({
+                    accessToken: data.access_token,
+                    user: data.user
+                });
 
                 // Redirect to dashboard
-                // router.push('/dashboard');
+                router.push('/dashboard');
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An error occurred');
                 hasAttemptedVerification.current = false;
@@ -74,12 +70,6 @@ function VerifyMagicLinkContent() {
 
         verifyToken();
     }, [searchParams, router, setSession]);
-
-    return (
-        <div>
-            <h1>{navigator.userAgent}</h1>
-        </div>
-    );
 
     if (isGmailBrowser) {
         return (
