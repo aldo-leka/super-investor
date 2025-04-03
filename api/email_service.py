@@ -2,7 +2,7 @@ import os
 import resend
 from fastapi import HTTPException
 from typing import Optional
-from config import RESEND_API_KEY, RESEND_FROM_EMAIL
+from config import RESEND_API_KEY, RESEND_FROM_EMAIL, FRONTEND_URL
 
 resend.api_key = RESEND_API_KEY
 
@@ -10,7 +10,7 @@ class EmailService:
     @staticmethod
     async def send_verification_email(email: str, token: str) -> bool:
         try:
-            verification_url = f"{os.getenv('FRONTEND_URL')}/verify-email?token={token}"
+            verification_url = f"{FRONTEND_URL}/verify-email?token={token}"
             response = resend.Emails.send({
                 "from": RESEND_FROM_EMAIL,
                 "to": email,
@@ -32,7 +32,7 @@ class EmailService:
     @staticmethod
     async def send_password_reset_email(email: str, token: str) -> bool:
         try:
-            reset_url = f"{os.getenv('FRONTEND_URL')}/reset-password?token={token}"
+            reset_url = f"{FRONTEND_URL}/reset-password?token={token}"
             response = resend.Emails.send({
                 "from": RESEND_FROM_EMAIL,
                 "to": email,
@@ -90,7 +90,7 @@ class EmailService:
                     <p>{greeting}</p>
                     <p>Thanks for choosing the {plan} plan! We're excited to help you supercharge your investment research.</p>
                     <p>To access your account, simply click the button below to sign in:</p>
-                    <p><a href="{os.getenv('FRONTEND_URL')}/login" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px;">Sign In to Super Investor</a></p>
+                    <p><a href="{FRONTEND_URL}/login" style="display: inline-block; padding: 12px 24px; background-color: #3b82f6; color: white; text-decoration: none; border-radius: 6px;">Sign In to Super Investor</a></p>
                     <p>On the sign-in page, enter this email address ({email}) then click the "Send Magic Link" button and we'll send you a secure login link.</p>
                     <p>Once you're logged in, you'll have immediate access to:</p>
                     <ul>
@@ -112,7 +112,7 @@ class EmailService:
     @staticmethod
     async def send_magic_link_email(email: str, token: str) -> bool:
         try:
-            login_url = f"{os.getenv('FRONTEND_URL')}/verify-magic-link?token={token}"
+            login_url = f"{FRONTEND_URL}/verify-magic-link?token={token}"
             response = resend.Emails.send({
                 "from": RESEND_FROM_EMAIL,
                 "to": email,

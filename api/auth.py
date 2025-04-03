@@ -24,6 +24,7 @@ from config import (
     REFRESH_TOKEN_COOKIE_SECURE,
     REFRESH_TOKEN_COOKIE_HTTPONLY,
     REFRESH_TOKEN_COOKIE_SAMESITE,
+    REFRESH_TOKEN_COOKIE_DOMAIN,
     TURNSTILE_SECRET_KEY,
     GOOGLE_CLIENT_ID
 )
@@ -249,6 +250,7 @@ def set_refresh_token_cookie(response: Response, token: str):
         httponly=REFRESH_TOKEN_COOKIE_HTTPONLY,
         secure=REFRESH_TOKEN_COOKIE_SECURE,
         samesite=REFRESH_TOKEN_COOKIE_SAMESITE,
+        domain=REFRESH_TOKEN_COOKIE_DOMAIN,
         max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # Convert days to seconds
         path="/"
     )

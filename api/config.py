@@ -57,5 +57,5 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30  # Refresh tokens last 30 days
 REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
 REFRESH_TOKEN_COOKIE_SECURE = True  # Only send cookie over HTTPS
 REFRESH_TOKEN_COOKIE_HTTPONLY = True  # Prevent JavaScript access
-REFRESH_TOKEN_COOKIE_SAMESITE = "lax"  # Prevent CSRF attacks
-
+REFRESH_TOKEN_COOKIE_SAMESITE = "none"  # lax Prevent CSRF attacks
+REFRESH_TOKEN_COOKIE_DOMAIN = ".superinvestor.pro"  # Enables sharing between api.superinvestor.pro and superinvestor.pro
