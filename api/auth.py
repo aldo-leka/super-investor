@@ -504,6 +504,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail="User not found")
         
         if user.is_verified:
+            print("User is already verified")
             # If already verified, return user data and new token
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
@@ -528,6 +529,8 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
         user.is_verified = True
         user.verification_token = None
         db.commit()
+
+        print("User is verified", user.is_verified)
         
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
@@ -659,6 +662,11 @@ async def verify_magic_link(token: str, response: Response, db: Session = Depend
             is_verified=True
         )
         db.add(user)
+    else:
+        # For existing users, mark their email as verified
+        user.is_verified = True
+        # Clear any existing verification token since email is now verified
+        user.verification_token = None
     
     # Update Stripe info if available
     if magic_link.stripe_customer_id:

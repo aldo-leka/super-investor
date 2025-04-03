@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 function VerifyMagicLinkContent() {
     const router = useRouter();
@@ -11,8 +11,16 @@ function VerifyMagicLinkContent() {
     const { setSession } = useAuth();
     const [error, setError] = useState<string | null>(null);
     const hasAttemptedVerification = useRef(false);
+    const [isGmailBrowser, setIsGmailBrowser] = useState(false);
 
     useEffect(() => {
+        // Check if user is using Gmail's in-app browser
+        const userAgent = navigator.userAgent.toLowerCase();
+        if (userAgent.includes('gmail') || userAgent.includes('google')) {
+            setIsGmailBrowser(true);
+            return;
+        }
+
         const verifyToken = async () => {
             const token = searchParams.get('token');
             if (!token) {
@@ -52,6 +60,37 @@ function VerifyMagicLinkContent() {
 
         verifyToken();
     }, [searchParams, router, setSession]);
+
+    if (isGmailBrowser) {
+        return (
+            <div className="flex min-h-screen flex-col items-center justify-center p-4">
+                <div className="w-full max-w-md space-y-4 text-center">
+                    <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500" />
+                    <h1 className="text-2xl font-bold text-gray-900">Browser Warning</h1>
+                    <p className="text-gray-600">
+                        It looks like you're using Gmail's in-app browser. For security reasons, please open this link in Chrome or Safari instead.
+                    </p>
+                    <div className="space-y-2">
+                        <button
+                            onClick={() => {
+                                const url = window.location.href;
+                                window.open(url, '_blank');
+                            }}
+                            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                        >
+                            Open in Chrome/Safari
+                        </button>
+                        <button
+                            onClick={() => router.push('/login')}
+                            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                        >
+                            Return to Login
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (error) {
         return (
