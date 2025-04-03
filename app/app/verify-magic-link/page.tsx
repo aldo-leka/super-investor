@@ -5,6 +5,21 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Loader2, AlertTriangle } from 'lucide-react';
 
+function isProbablyInAppWebView(): boolean {
+    const ua = navigator.userAgent || '';
+    const standalone = (navigator as any).standalone;
+
+    const isIOS = /iPhone|iPad|iPod/.test(ua);
+    const isSafari = /Safari/.test(ua) && !/CriOS/.test(ua);
+    const isAndroid = /Android/.test(ua);
+    const isGmail = /Gmail/.test(ua) || /com.google.android.gm/.test(ua);
+
+    return (
+        (isIOS && !isSafari && standalone === false) || // iOS in-app browser
+        (isAndroid && isGmail) // Android Gmail webview
+    );
+}
+
 function VerifyMagicLinkContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -15,14 +30,7 @@ function VerifyMagicLinkContent() {
 
     useEffect(() => {
         // Check if user is using Gmail's in-app browser
-        const userAgent = navigator.userAgent || '';
-        const isGmailWebview =
-            /Gmail|Google.*(GSA|Mobile)/i.test(userAgent) ||
-            ((navigator as any).standalone === false &&
-                /iPhone|iPad|iPod/i.test(userAgent) &&
-                !/Safari/.test(userAgent));
-
-        if (isGmailWebview) {
+        if (isProbablyInAppWebView()) {
             setIsGmailBrowser(true);
             return;
         }
