@@ -47,25 +47,25 @@ function VerifyMagicLinkContent() {
             hasAttemptedVerification.current = true;
 
             try {
-                const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-magic-link/${token}`, {
-                    method: 'GET',
-                    credentials: 'include', // This is critical for setting the refresh_token cookie
-                });
+                // const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/verify-magic-link/${token}`, {
+                //     method: 'GET',
+                //     credentials: 'include', // This is critical for setting the refresh_token cookie
+                // });
 
-                const data = await response.json();
+                // const data = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(data.detail || 'Failed to verify magic link');
-                }
+                // if (!response.ok) {
+                //     throw new Error(data.detail || 'Failed to verify magic link');
+                // }
 
                 // Set the session with the returned data
-                setSession({
-                    accessToken: data.access_token,
-                    user: data.user
-                });
+                // setSession({
+                //     accessToken: data.access_token,
+                //     user: data.user
+                // });
 
                 // Redirect to dashboard
-                router.push('/dashboard');
+                // router.push('/dashboard');
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'An error occurred');
                 hasAttemptedVerification.current = false;
@@ -74,6 +74,12 @@ function VerifyMagicLinkContent() {
 
         verifyToken();
     }, [searchParams, router, setSession]);
+
+    return (
+        <div>
+            <h1>{navigator.userAgent}</h1>
+        </div>
+    );
 
     if (isGmailBrowser) {
         return (
