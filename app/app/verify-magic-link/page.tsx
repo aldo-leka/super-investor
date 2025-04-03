@@ -15,8 +15,14 @@ function VerifyMagicLinkContent() {
 
     useEffect(() => {
         // Check if user is using Gmail's in-app browser
-        const userAgent = navigator.userAgent.toLowerCase();
-        if (userAgent.includes('gmail') || userAgent.includes('google')) {
+        const userAgent = navigator.userAgent || '';
+        const isGmailWebview =
+            /Gmail|Google.*(GSA|Mobile)/i.test(userAgent) ||
+            ((navigator as any).standalone === false &&
+                /iPhone|iPad|iPod/i.test(userAgent) &&
+                !/Safari/.test(userAgent));
+
+        if (isGmailWebview) {
             setIsGmailBrowser(true);
             return;
         }
