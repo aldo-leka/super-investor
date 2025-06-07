@@ -26,19 +26,43 @@ This project is about making investment research more enjoyable through a better
 ---
 
 ## 🏗 Getting Started
-To run the project locally:
 
-\`\`\`bash
+### Prerequisites
+- Node.js 18+ 
+- npm/yarn/pnpm
+- Python 3.13 (for the API)
+
+### Frontend Setup
+To run the frontend locally:
+
+```bash
 git clone https://github.com/aldo-leka/super-investor.git
 cd super-investor/app
-npm install  # or yarn install / pnpm install
+npm install --legacy-peer-deps  # Required due to React 19 peer dependency conflicts
 npm run dev
-\`\`\`
+```
 
-**Create a `.env.local` file** in the root of this project.
-Copy the contents of `.env.example` and configure your settings.
+**Note:** The `--legacy-peer-deps` flag is needed because some dependencies (like cmdk) haven't been updated for React 19 yet.
 
-Then open [http://localhost:3000](http://localhost:3000) in your browser.
+**Create a `.env.local` file** in the root of the app directory.
+Copy the contents of `.env.example` and configure your settings:
+- `NEXT_PUBLIC_API_URL` - Your backend API URL (default: http://localhost:8000)
+- Other environment variables as needed
+
+The frontend will be available at [http://localhost:3000](http://localhost:3000).
+
+### Backend Setup
+To run the API server:
+
+```bash
+cd super-investor/api
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+```
+
+The API will be available at [http://localhost:8000](http://localhost:8000).
 
 ---
 

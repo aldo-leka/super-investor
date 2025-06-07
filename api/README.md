@@ -34,7 +34,7 @@ Before running the backend, ensure you have:
 ```
 - Open `.env` and **set your `USER_AGENT`**:
 ```ini
-   USER_AGENT=Your name(your email)
+   USER_AGENT=Your name (your email)
 ```
 
 🚨 **This is required!** The backend will NOT run without it.
@@ -43,6 +43,11 @@ Before running the backend, ensure you have:
 After setting up your environment variables, start the FastAPI server:
 ```sh
    fastapi dev main.py
+```
+
+Or even better with hot reload and console message:
+```sh
+   uvicorn main:app --reload --port 8000
 ```
 
 Your backend will be available at: `http://127.0.0.1:8000`
